@@ -1,4 +1,4 @@
-import { genai, VISION_MODEL } from "@/lib/gemini";
+import { getGenAI, VISION_MODEL } from "@/lib/gemini";
 import { buildRefinePromptTemplate } from "@/lib/prompts";
 import { RefinePromptResponse } from "@/lib/types";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const prompt = buildRefinePromptTemplate(userDescription, styleKeywords);
 
-    const response = await genai.models.generateContent({
+    const response = await getGenAI().models.generateContent({
       model: VISION_MODEL,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });

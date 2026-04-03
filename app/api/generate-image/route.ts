@@ -1,11 +1,12 @@
-import { genai, IMAGE_GEN_MODEL } from "@/lib/gemini";
+import { getGenAI, IMAGE_GEN_MODEL } from "@/lib/gemini";
 import { buildFinalImagePromptWithReference } from "@/lib/prompts";
 import { GenerateImageResponse, AspectRatio } from "@/lib/types";
+import type { GoogleGenAI } from "@google/genai";
 
 // Vercel 部署时允许最多 120 秒超时（2K 图片生成较慢）
 export const maxDuration = 120;
 
-type GenerateParams = Parameters<typeof genai.models.generateContent>[0];
+type GenerateParams = Parameters<GoogleGenAI["models"]["generateContent"]>[0];
 
 /**
  * 带指数退避的重试包装
@@ -15,7 +16,7 @@ async function generateWithRetry(params: GenerateParams, maxRetries = 2) {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await genai.models.generateContent(params);
+      return await getGenAI().models.generateContent(params);
     } catch (err) {
       lastError = err;
       if (attempt < maxRetries) {

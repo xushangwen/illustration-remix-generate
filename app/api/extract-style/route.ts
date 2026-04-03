@@ -1,4 +1,4 @@
-import { genai, VISION_MODEL } from "@/lib/gemini";
+import { getGenAI, VISION_MODEL } from "@/lib/gemini";
 import { STYLE_EXTRACTION_PROMPT } from "@/lib/prompts";
 import { safeParseJSON, isSupportedImageType } from "@/lib/image-utils";
 import { ExtractStyleResponse } from "@/lib/types";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const arrayBuffer = await imageFile.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-    const response = await genai.models.generateContent({
+    const response = await getGenAI().models.generateContent({
       model: VISION_MODEL,
       contents: [
         {
