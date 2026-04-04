@@ -63,10 +63,10 @@ export function Step3Result({
 
           {/* 操作按钮：重新开始（破坏性）/ 重新生成 + 下载 */}
           <div className="flex items-center justify-between gap-4">
-            {/* 左侧：重新开始 — home icon + border-2 深色，第一眼可辨，语义与「重新生成」完全不同 */}
+            {/* 左侧：重新开始 — AI aurora 动态渐变填充，视觉语言与右侧两个按钮完全不同类 */}
             <button
               onClick={onReset}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 border-2 border-neutral-800 rounded-xl hover:bg-neutral-800 hover:text-white transition-all"
+              className="btn-ai-restart flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300"
             >
               <i className="ri-home-5-line text-base" />
               重新开始

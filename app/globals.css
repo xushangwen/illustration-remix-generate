@@ -20,3 +20,23 @@ body {
   font-family: "IBM Plex Sans SC", "Space Grotesk", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* AI CTA 动态渐变按钮 — 颜色流动模拟 AI aurora 质感 */
+@keyframes ai-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-ai-restart {
+  background: linear-gradient(-45deg, #6366f1, #7c3aed, #a855f7, #818cf8);
+  background-size: 280% 280%;
+  animation: ai-gradient-shift 4s ease infinite;
+  color: white;
+  border: none;
+}
+
+.btn-ai-restart:hover {
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.5);
+  filter: brightness(1.08);
+}
