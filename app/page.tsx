@@ -29,12 +29,17 @@ export default function Home() {
       {/* 顶部 Header */}
       <header className="border-b border-neutral-200 bg-white">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center">
+          {/* 点击 logo 区域回到初始状态，step=1 时无需 reset */}
+          <button
+            onClick={() => state.step !== 1 && reset()}
+            className="flex items-center gap-2.5 group"
+            aria-label="回到首页"
+          >
+            <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center group-hover:bg-neutral-700 transition-colors">
               <i className="ri-brush-ai-line text-white text-sm" />
             </div>
-            <span className="text-sm font-semibold text-neutral-800">插画风格生成器</span>
-          </div>
+            <span className="text-sm font-semibold text-neutral-800 group-hover:text-neutral-600 transition-colors">插画风格生成器</span>
+          </button>
           <span className="text-xs text-neutral-400">由 Gemini 驱动</span>
         </div>
       </header>

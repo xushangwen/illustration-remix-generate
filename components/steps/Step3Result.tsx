@@ -61,15 +61,19 @@ export function Step3Result({
             />
           </div>
 
-          {/* 操作按钮 */}
-          <div className="flex items-center justify-between">
+          {/* 操作按钮：重新开始（破坏性）/ 重新生成 + 下载 */}
+          <div className="flex items-center justify-between gap-4">
+            {/* 左侧：重新开始 — 带边框 + 独立视觉，避免与右侧混淆 */}
             <button
               onClick={onReset}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-600 border border-neutral-300 rounded-xl hover:border-neutral-400 hover:bg-neutral-50 transition-colors"
             >
-              <i className="ri-refresh-line" />
+              <i className="ri-arrow-go-back-line" />
               重新开始
             </button>
+
+            {/* 竖线分隔符：明确区隔"重置流程"与"当前结果操作" */}
+            <div className="h-8 w-px bg-neutral-200 flex-shrink-0" />
 
             <div className="flex gap-2">
               <button
