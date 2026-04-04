@@ -63,12 +63,12 @@ export function Step3Result({
 
           {/* 操作按钮：重新开始（破坏性）/ 重新生成 + 下载 */}
           <div className="flex items-center justify-between gap-4">
-            {/* 左侧：重新开始 — 带边框 + 独立视觉，避免与右侧混淆 */}
+            {/* 左侧：重新开始 — home icon + border-2 深色，第一眼可辨，语义与「重新生成」完全不同 */}
             <button
               onClick={onReset}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-600 border border-neutral-300 rounded-xl hover:border-neutral-400 hover:bg-neutral-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 border-2 border-neutral-800 rounded-xl hover:bg-neutral-800 hover:text-white transition-all"
             >
-              <i className="ri-arrow-go-back-line" />
+              <i className="ri-home-5-line text-base" />
               重新开始
             </button>
 
