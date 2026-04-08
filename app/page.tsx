@@ -7,7 +7,7 @@ import { KeywordBadge } from "@/components/ui/KeywordBadge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { isSupportedImageType, downloadBase64Image, generateFileName } from "@/lib/image-utils";
 import { useGenerationFlow } from "@/hooks/useGenerationFlow";
-import type { AspectRatio, ImageResolution, ImageCount } from "@/lib/types";
+import type { AspectRatio, ImageResolution, ImageCount, BackgroundMode } from "@/lib/types";
 
 // ─── 选项配置 ────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,13 @@ const IMAGE_COUNTS: { value: ImageCount; label: string }[] = [
   { value: 4, label: "× 4" },
 ];
 
+const BACKGROUND_MODES: { value: BackgroundMode; label: string; desc: string; icon: string }[] = [
+  { value: "reference", label: "参照原图", desc: "保留参考图背景风格", icon: "ri-image-line" },
+  { value: "clean",     label: "干净背景", desc: "白色/浅色简洁背景",  icon: "ri-contrast-2-line" },
+  { value: "isolated",  label: "无背景",   desc: "纯主体，适合图标",   icon: "ri-subtract-line" },
+  { value: "custom",    label: "自定义",   desc: "描述你想要的背景",   icon: "ri-edit-line" },
+];
+
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -36,6 +43,7 @@ export default function Home() {
     state,
     extractStyle, refinePrompt, editPrompt, generateImage,
     setRefinedPrompt, setAspectRatio, setImageResolution, setImageCount,
+    setBackgroundMode, setBackgroundCustomText,
     clearError, reset,
   } = useGenerationFlow();
 
@@ -272,6 +280,22 @@ export default function Home() {
                           </p>
                         )}
                       </div>
+
+                      {/* 背景元素预警：检测到背景元素时提示用户 */}
+                      {state.backgroundHints.length > 0 && (
+                        <div className="flex gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                          <i className="ri-alert-line text-amber-500 text-sm shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-amber-700">检测到背景元素</p>
+                            <p className="text-xs text-amber-600 mt-0.5">
+                              {state.backgroundHints.join("、")}
+                            </p>
+                            <p className="text-xs text-amber-500 mt-1">
+                              若不想要这些背景，在「生成设置」里切换背景模式
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -461,6 +485,42 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+                {/* 背景控制 */}
+                <div className="flex flex-col gap-1.5 w-full">
+                  <span className="text-xs text-neutral-400 font-medium">背景处理</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {BACKGROUND_MODES.map((m) => (
+                      <button
+                        key={m.value}
+                        onClick={() => setBackgroundMode(m.value)}
+                        title={m.desc}
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-medium transition-all ${
+                          state.backgroundMode === m.value
+                            ? "bg-neutral-800 text-white border-neutral-800"
+                            : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
+                        } ${m.value === "reference" && state.backgroundHints.length > 0 ? "border-amber-300" : ""}`}
+                      >
+                        <i className={m.icon} />
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* 自定义背景描述输入 */}
+                  {state.backgroundMode === "custom" && (
+                    <input
+                      type="text"
+                      value={state.backgroundCustomText}
+                      onChange={(e) => setBackgroundCustomText(e.target.value)}
+                      placeholder="描述背景，例如：渐变蓝色、森林场景、简单几何图案..."
+                      className="w-full mt-1 px-3.5 py-2.5 text-xs text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-300 transition-all placeholder:text-neutral-400"
+                    />
+                  )}
+                  {/* 背景模式说明 */}
+                  <p className="text-xs text-neutral-400">
+                    {BACKGROUND_MODES.find((m) => m.value === state.backgroundMode)?.desc}
+                  </p>
+                </div>
 
               {/* 生成按钮 */}
               <button

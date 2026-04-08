@@ -1,6 +1,6 @@
 import { getGenAI, IMAGE_GEN_MODEL } from "@/lib/gemini";
 import { buildFinalImagePromptWithReference } from "@/lib/prompts";
-import { AspectRatio, ImageResolution, ImageCount } from "@/lib/types";
+import { AspectRatio, ImageResolution, ImageCount, BackgroundMode } from "@/lib/types";
 import type { GoogleGenAI } from "@google/genai";
 
 export const maxDuration = 180;
@@ -43,6 +43,9 @@ export async function POST(request: Request) {
     aspectRatio: AspectRatio;
     imageResolution: ImageResolution;
     imageCount: ImageCount;
+    backgroundMode: BackgroundMode;
+    backgroundCustomText: string;
+    backgroundHints: string[];
     referenceImageBase64: string | null;
     referenceImageMimeType: string | null;
   };
@@ -56,6 +59,7 @@ export async function POST(request: Request) {
   const {
     refinedPrompt, styleKeywords, styleDescription,
     aspectRatio, imageResolution, imageCount,
+    backgroundMode, backgroundCustomText, backgroundHints,
     referenceImageBase64, referenceImageMimeType,
   } = body;
 
@@ -66,7 +70,14 @@ export async function POST(request: Request) {
   const count = imageCount ?? 1;
   const resolution = imageResolution ?? "2K";
 
-  const textPrompt = buildFinalImagePromptWithReference(refinedPrompt, styleKeywords, styleDescription);
+  const textPrompt = buildFinalImagePromptWithReference(
+    refinedPrompt,
+    styleKeywords,
+    styleDescription,
+    backgroundMode ?? "reference",
+    backgroundCustomText ?? "",
+    backgroundHints ?? []
+  );
 
   const parts: object[] = [];
   if (referenceImageBase64 && referenceImageMimeType) {

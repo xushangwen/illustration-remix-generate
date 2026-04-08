@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       keywords: parsed.keywords,
       description: parsed.description ?? "",
       descriptionZh: parsed.descriptionZh ?? "",
+      backgroundHints: Array.isArray(parsed.backgroundHints) ? parsed.backgroundHints : [],
     } satisfies ExtractStyleResponse);
   } catch (error) {
     console.error("[extract-style]", error);

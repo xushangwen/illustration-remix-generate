@@ -4,7 +4,7 @@ import { useReducer, useCallback } from "react";
 import imageCompression from "browser-image-compression";
 import {
   AppState, AppAction,
-  AspectRatio, ImageResolution, ImageCount,
+  AspectRatio, ImageResolution, ImageCount, BackgroundMode,
   ExtractStyleResponse, RefinePromptResponse,
 } from "@/lib/types";
 
@@ -15,11 +15,14 @@ const initialState: AppState = {
   styleKeywords: [],
   styleDescription: "",
   styleDescriptionZh: "",
+  backgroundHints: [],
   refinedPrompt: "",
   refinedPromptZh: "",
   aspectRatio: "1:1",
   imageResolution: "2K",
   imageCount: 1,
+  backgroundMode: "reference",
+  backgroundCustomText: "",
   resultImages: [],
   pendingCount: 0,
   loadingStage: null,
@@ -47,8 +50,13 @@ function reducer(state: AppState, action: AppAction): AppState {
         styleKeywords: action.payload.keywords,
         styleDescription: action.payload.description,
         styleDescriptionZh: action.payload.descriptionZh,
+        backgroundHints: action.payload.backgroundHints,
         loadingStage: null,
       };
+    case "SET_BACKGROUND_MODE":
+      return { ...state, backgroundMode: action.payload };
+    case "SET_BACKGROUND_CUSTOM_TEXT":
+      return { ...state, backgroundCustomText: action.payload };
     case "SET_REFINED_PROMPT":
       return {
         ...state,
@@ -136,6 +144,7 @@ export function useGenerationFlow() {
           keywords: styleData.keywords,
           description: styleData.description,
           descriptionZh: styleData.descriptionZh ?? "",
+          backgroundHints: styleData.backgroundHints ?? [],
         },
       });
     } catch (err) {
@@ -211,6 +220,9 @@ export function useGenerationFlow() {
           aspectRatio: state.aspectRatio,
           imageResolution: state.imageResolution,
           imageCount: state.imageCount,
+          backgroundMode: state.backgroundMode,
+          backgroundCustomText: state.backgroundCustomText,
+          backgroundHints: state.backgroundHints,
           referenceImageBase64: state.referenceImageBase64,
           referenceImageMimeType: state.referenceImageMimeType,
         }),
@@ -270,6 +282,9 @@ export function useGenerationFlow() {
     state.aspectRatio,
     state.imageResolution,
     state.imageCount,
+    state.backgroundMode,
+    state.backgroundCustomText,
+    state.backgroundHints,
     state.referenceImageBase64,
     state.referenceImageMimeType,
   ]);
@@ -283,6 +298,8 @@ export function useGenerationFlow() {
   const setAspectRatio = useCallback((r: AspectRatio) => dispatch({ type: "SET_ASPECT_RATIO", payload: r }), []);
   const setImageResolution = useCallback((r: ImageResolution) => dispatch({ type: "SET_IMAGE_RESOLUTION", payload: r }), []);
   const setImageCount = useCallback((c: ImageCount) => dispatch({ type: "SET_IMAGE_COUNT", payload: c }), []);
+  const setBackgroundMode = useCallback((m: BackgroundMode) => dispatch({ type: "SET_BACKGROUND_MODE", payload: m }), []);
+  const setBackgroundCustomText = useCallback((t: string) => dispatch({ type: "SET_BACKGROUND_CUSTOM_TEXT", payload: t }), []);
   const clearError = useCallback(() => dispatch({ type: "CLEAR_ERROR" }), []);
   const reset = useCallback(() => dispatch({ type: "RESET" }), []);
 
@@ -296,6 +313,8 @@ export function useGenerationFlow() {
     setAspectRatio,
     setImageResolution,
     setImageCount,
+    setBackgroundMode,
+    setBackgroundCustomText,
     clearError,
     reset,
   };

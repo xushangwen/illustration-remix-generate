@@ -1,8 +1,9 @@
 // 所有 Gemini Prompt 模板集中管理
+import type { BackgroundMode } from "./types";
 
 /**
  * Step 1: 插画风格提取
- * 增加 descriptionZh 字段，中文风格摘要直接随分析结果一起返回
+ * 新增 backgroundHints：单独识别背景相关元素，供用户感知并在生成设置中控制
  */
 export const STYLE_EXTRACTION_PROMPT = `You are a professional illustration style analyst. Analyze this illustration and extract its visual style characteristics.
 
@@ -14,23 +15,26 @@ Return ONLY valid JSON in this exact format, no markdown, no explanation:
     "loose brush strokes"
   ],
   "description": "A concise one-sentence style summary for use in image generation prompts",
-  "descriptionZh": "用一句简洁的中文描述这张插画的视觉风格特征"
+  "descriptionZh": "用一句简洁的中文描述这张插画的视觉风格特征",
+  "backgroundHints": ["kraft paper texture", "warm beige background"]
 }
 
-Focus on extracting 6-10 keywords covering:
-- Color palette (specific hues, saturation level, warmth/coolness)
-- Line quality (thick/thin, sketchy/precise, presence of outlines)
-- Texture and surface treatment (smooth/rough, paper texture, grain)
-- Lighting approach (flat/dramatic/soft/rim light)
-- Art movement or era (modernism, art nouveau, retro, contemporary)
-- Medium simulation (watercolor, gouache, digital, risograph, oil paint, pencil)
-- Compositional tendencies (minimalist, dense, symmetrical, organic)
+For the "keywords" field, focus on the SUBJECT's rendering style (6-10 keywords):
+- Color palette of the subject itself
+- Line quality and stroke characteristics
+- Texture and surface treatment of the subject
+- Lighting and shadow approach
+- Art movement or medium (watercolor, gouache, risograph, etc.)
+- Compositional tendencies
+
+For the "backgroundHints" field, list ONLY elements that belong to the background/environment context
+(paper texture, background color, backdrop patterns, environmental textures, vignette effects).
+If there are no notable background elements, return an empty array [].
 
 Output ONLY the JSON object. Do not wrap in code blocks.`;
 
 /**
- * Step 2: 场景描述精化
- * 输出 JSON，同时包含英文生图 Prompt 和中文对照说明
+ * Step 2: 场景描述精化（输出中英双语 JSON）
  */
 export function buildRefinePromptTemplate(
   userDescription: string,
@@ -57,8 +61,7 @@ Output ONLY the JSON object. Do not wrap in code blocks.`;
 }
 
 /**
- * Step 2 扩展: 在已有 Prompt 基础上按用户描述修改
- * 输出 JSON，同时包含修改后的英文 Prompt 和中文对照
+ * Step 2 扩展: 在已有 Prompt 基础上按用户描述修改（输出中英双语 JSON）
  */
 export function buildEditPromptTemplate(
   currentPrompt: string,
@@ -90,23 +93,69 @@ Output ONLY the JSON object. Do not wrap in code blocks.`;
 }
 
 /**
- * Step 3: 生图 Prompt —— 垫图模式
- * 参考图 base64 作为 multimodal inlineData，置于文字 Prompt 之前
- * 双重约束：视觉参考图锁定风格，关键词文字进一步加强风格特征
+ * 根据背景模式生成背景覆盖指令
+ * clean / isolated / custom 模式下，明确告知模型不要复刻参考图背景
+ */
+function buildBackgroundInstruction(
+  mode: BackgroundMode,
+  customText: string,
+  backgroundHints: string[]
+): string {
+  // 有检测到背景元素时，用于明确排除
+  const hintsNote =
+    backgroundHints.length > 0
+      ? ` (Do NOT replicate these background elements from the reference: ${backgroundHints.join(", ")})`
+      : "";
+
+  switch (mode) {
+    case "reference":
+      // 参照原图：不做额外限制
+      return "";
+    case "clean":
+      return `\nBackground: clean white or very light neutral background. Solid, minimal, no texture.${hintsNote}`;
+    case "isolated":
+      return `\nBackground: completely transparent / no background. Subject only, fully isolated, suitable for sticker or icon use. No background elements whatsoever.${hintsNote}`;
+    case "custom":
+      return customText.trim()
+        ? `\nBackground: ${customText.trim()}.${hintsNote}`
+        : `\nBackground: clean, minimal.${hintsNote}`;
+  }
+}
+
+/**
+ * Step 3: 生图 Prompt —— 垫图模式（参考图 + 文字双重约束）
+ * backgroundMode 非 reference 时，主动过滤背景关键词并注入背景覆盖指令
  */
 export function buildFinalImagePromptWithReference(
   refinedPrompt: string,
   styleKeywords: string[],
-  styleDescription: string
+  styleDescription: string,
+  backgroundMode: BackgroundMode = "reference",
+  backgroundCustomText: string = "",
+  backgroundHints: string[] = []
 ): string {
-  return `The image above is a style reference. Extract ONLY its visual style — art style, color palette, line quality, stroke characteristics, texture, rendering technique, and mood. Ignore any text, watermarks, logos, or signatures present in the reference image entirely.
+  // 非"参照原图"模式：从关键词中过滤掉背景相关词，避免背景元素通过关键词通道污染生图
+  const filteredKeywords =
+    backgroundMode === "reference"
+      ? styleKeywords
+      : styleKeywords.filter(
+          (kw) => !backgroundHints.some((hint) => kw.toLowerCase().includes(hint.toLowerCase().split(" ")[0]))
+        );
 
-Do NOT copy the content or subject matter of the reference image. Do NOT reproduce any text or watermarks from it.
+  const backgroundInstruction = buildBackgroundInstruction(
+    backgroundMode,
+    backgroundCustomText,
+    backgroundHints
+  );
+
+  return `The image above is a style reference. Extract ONLY the subject's rendering style — art technique, color palette of the subject, line quality, stroke characteristics, texture of the subject, rendering method, and mood. Ignore any text, watermarks, logos, or signatures entirely.
+
+Do NOT copy the content or subject matter of the reference image. Do NOT reproduce any text or watermarks from it.${backgroundMode !== "reference" ? "\nDo NOT replicate the background, paper texture, or backdrop from the reference image." : ""}
 
 Generate a new illustration in exactly this visual style depicting:
 ${refinedPrompt}
 
-Additional style notes: ${styleDescription}. Key characteristics: ${styleKeywords.join(", ")}.
+Style notes: ${styleDescription}. Key characteristics: ${filteredKeywords.join(", ")}.${backgroundInstruction}
 
 IMPORTANT: The output image must contain NO text, NO watermarks, NO logos, NO signatures, NO typographic elements of any kind. Pure illustration only.`;
 }
