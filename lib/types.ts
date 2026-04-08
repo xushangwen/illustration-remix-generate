@@ -14,11 +14,13 @@ export interface AppState {
   referenceImagePreview: string | null;
   referenceImageBase64: string | null;
   referenceImageMimeType: string | null;
-  // 风格分析结果
+  // 风格分析结果（含中文摘要）
   styleKeywords: string[];
   styleDescription: string;
-  // 生图描述
+  styleDescriptionZh: string;
+  // 生图描述（含中文对照）
   refinedPrompt: string;
+  refinedPromptZh: string;
   // 生成设置
   aspectRatio: AspectRatio;
   imageResolution: ImageResolution;
@@ -36,8 +38,8 @@ export type AppAction =
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "CLEAR_ERROR" }
   | { type: "SET_REFERENCE_IMAGE"; payload: { previewUrl: string; base64: string; mimeType: string } }
-  | { type: "SET_STYLE_RESULT"; payload: { keywords: string[]; description: string } }
-  | { type: "SET_REFINED_PROMPT"; payload: string }
+  | { type: "SET_STYLE_RESULT"; payload: { keywords: string[]; description: string; descriptionZh: string } }
+  | { type: "SET_REFINED_PROMPT"; payload: { prompt: string; promptZh: string } }
   | { type: "SET_ASPECT_RATIO"; payload: AspectRatio }
   | { type: "SET_IMAGE_RESOLUTION"; payload: ImageResolution }
   | { type: "SET_IMAGE_COUNT"; payload: ImageCount }
@@ -50,8 +52,10 @@ export type AppAction =
 export interface ExtractStyleResponse {
   keywords: string[];
   description: string;
+  descriptionZh: string;
 }
 
 export interface RefinePromptResponse {
   refinedPrompt: string;
+  refinedPromptZh: string;
 }

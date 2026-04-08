@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     return Response.json({
       keywords: parsed.keywords,
       description: parsed.description ?? "",
+      descriptionZh: parsed.descriptionZh ?? "",
     } satisfies ExtractStyleResponse);
   } catch (error) {
     console.error("[extract-style]", error);

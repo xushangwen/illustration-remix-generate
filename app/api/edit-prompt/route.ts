@@ -1,6 +1,7 @@
 import { getGenAI, VISION_MODEL } from "@/lib/gemini";
 import { buildEditPromptTemplate } from "@/lib/prompts";
 import { RefinePromptResponse } from "@/lib/types";
+import { safeParseJSON } from "@/lib/image-utils";
 
 export async function POST(request: Request) {
   try {
@@ -26,13 +27,29 @@ export async function POST(request: Request) {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
-    const refinedPrompt = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const rawText = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!rawText) {
+      throw new Error("Gemini 未返回有效内容");
+    }
+
+    let refinedPrompt = "";
+    let refinedPromptZh = "";
+
+    try {
+      const parsed = safeParseJSON<{ prompt: string; promptZh: string }>(rawText);
+      refinedPrompt = parsed.prompt?.trim() ?? "";
+      refinedPromptZh = parsed.promptZh?.trim() ?? "";
+    } catch {
+      refinedPrompt = rawText;
+      refinedPromptZh = "";
+    }
 
     if (!refinedPrompt) {
       throw new Error("Gemini 未返回有效的 Prompt");
     }
 
-    return Response.json({ refinedPrompt } satisfies RefinePromptResponse);
+    return Response.json({ refinedPrompt, refinedPromptZh } satisfies RefinePromptResponse);
   } catch (error) {
     console.error("[edit-prompt]", error);
     const message = error instanceof Error ? error.message : "提示词优化失败，请重试";

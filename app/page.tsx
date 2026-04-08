@@ -264,6 +264,13 @@ export default function Home() {
                         <p className="text-xs text-neutral-500 font-mono bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 leading-relaxed select-all">
                           {stylePromptText}
                         </p>
+                        {/* 中文风格摘要 */}
+                        {state.styleDescriptionZh && (
+                          <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
+                            <span className="text-neutral-300 mr-1">中文</span>
+                            {state.styleDescriptionZh}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : null}
@@ -335,6 +342,13 @@ export default function Home() {
                       disabled={isRefining}
                       className="w-full px-4 py-3 text-sm text-neutral-700 bg-white border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all font-mono leading-relaxed disabled:opacity-60"
                     />
+                    {/* 中文对照 */}
+                    {state.refinedPromptZh && (
+                      <div className="flex gap-2 px-3 py-2 bg-neutral-50 border border-neutral-100 rounded-lg">
+                        <span className="text-xs text-neutral-300 shrink-0 mt-0.5">中文</span>
+                        <p className="text-xs text-neutral-500 leading-relaxed">{state.refinedPromptZh}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* AI 修改指令输入 */}

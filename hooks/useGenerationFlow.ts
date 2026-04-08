@@ -14,7 +14,9 @@ const initialState: AppState = {
   referenceImageMimeType: null,
   styleKeywords: [],
   styleDescription: "",
+  styleDescriptionZh: "",
   refinedPrompt: "",
+  refinedPromptZh: "",
   aspectRatio: "1:1",
   imageResolution: "2K",
   imageCount: 1,
@@ -44,10 +46,16 @@ function reducer(state: AppState, action: AppAction): AppState {
         ...state,
         styleKeywords: action.payload.keywords,
         styleDescription: action.payload.description,
+        styleDescriptionZh: action.payload.descriptionZh,
         loadingStage: null,
       };
     case "SET_REFINED_PROMPT":
-      return { ...state, refinedPrompt: action.payload, loadingStage: null };
+      return {
+        ...state,
+        refinedPrompt: action.payload.prompt,
+        refinedPromptZh: action.payload.promptZh,
+        loadingStage: null,
+      };
     case "SET_ASPECT_RATIO":
       return { ...state, aspectRatio: action.payload };
     case "SET_IMAGE_RESOLUTION":
@@ -121,7 +129,15 @@ export function useGenerationFlow() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "风格提取失败");
 
-      dispatch({ type: "SET_STYLE_RESULT", payload: data as ExtractStyleResponse });
+      const styleData = data as ExtractStyleResponse;
+      dispatch({
+        type: "SET_STYLE_RESULT",
+        payload: {
+          keywords: styleData.keywords,
+          description: styleData.description,
+          descriptionZh: styleData.descriptionZh ?? "",
+        },
+      });
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "风格提取失败" });
     }
@@ -139,7 +155,11 @@ export function useGenerationFlow() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Prompt 精化失败");
-        dispatch({ type: "SET_REFINED_PROMPT", payload: (data as RefinePromptResponse).refinedPrompt });
+        const refineData = data as RefinePromptResponse;
+        dispatch({
+          type: "SET_REFINED_PROMPT",
+          payload: { prompt: refineData.refinedPrompt, promptZh: refineData.refinedPromptZh ?? "" },
+        });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "Prompt 精化失败" });
       }
@@ -164,7 +184,11 @@ export function useGenerationFlow() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "提示词优化失败");
-        dispatch({ type: "SET_REFINED_PROMPT", payload: (data as RefinePromptResponse).refinedPrompt });
+        const editData = data as RefinePromptResponse;
+        dispatch({
+          type: "SET_REFINED_PROMPT",
+          payload: { prompt: editData.refinedPrompt, promptZh: editData.refinedPromptZh ?? "" },
+        });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "提示词优化失败" });
       }
@@ -250,7 +274,12 @@ export function useGenerationFlow() {
     state.referenceImageMimeType,
   ]);
 
-  const setRefinedPrompt = useCallback((p: string) => dispatch({ type: "SET_REFINED_PROMPT", payload: p }), []);
+  // 用户手动编辑 prompt 时保留原有中文对照（中文不变）
+  const setRefinedPrompt = useCallback(
+    (p: string) =>
+      dispatch({ type: "SET_REFINED_PROMPT", payload: { prompt: p, promptZh: state.refinedPromptZh } }),
+    [state.refinedPromptZh]
+  );
   const setAspectRatio = useCallback((r: AspectRatio) => dispatch({ type: "SET_ASPECT_RATIO", payload: r }), []);
   const setImageResolution = useCallback((r: ImageResolution) => dispatch({ type: "SET_IMAGE_RESOLUTION", payload: r }), []);
   const setImageCount = useCallback((c: ImageCount) => dispatch({ type: "SET_IMAGE_COUNT", payload: c }), []);
