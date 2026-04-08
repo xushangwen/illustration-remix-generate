@@ -5,7 +5,7 @@ import { useDropzone } from "react-dropzone";
 import imageCompression from "browser-image-compression";
 import { KeywordBadge } from "@/components/ui/KeywordBadge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { isSupportedImageType, downloadBase64Image, generateFileName } from "@/lib/image-utils";
+import { isSupportedImageType, downloadBase64Image, generateFileName, MAX_UPLOAD_BYTES } from "@/lib/image-utils";
 import { useGenerationFlow } from "@/hooks/useGenerationFlow";
 import { buildFinalImagePromptWithReference } from "@/lib/prompts";
 import type { AspectRatio, ImageResolution, ImageCount, BackgroundMode } from "@/lib/types";
@@ -52,9 +52,11 @@ export default function Home() {
   const [description, setDescription] = useState("");
   const [editRequest, setEditRequest]  = useState("");
   const [styleCopied, setStyleCopied]  = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const descRef    = useRef<HTMLTextAreaElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   // 派生状态
   const isExtracting = state.loadingStage === "extract";
@@ -64,6 +66,7 @@ export default function Home() {
   const hasPrompt    = !!state.refinedPrompt;
   const hasResults   = state.resultImages.length > 0;
   const canGenerate  = hasPrompt && !isGenerating && !isRefining;
+  const step1Error = uploadError ?? (state.loadingStage === null && !hasStyle ? state.error : null);
 
   // 客户端实时计算最终融合提示词，供预览卡片展示
   // 背景设置变更时自动重新计算；若用户已手动修改则显示手动值
@@ -107,22 +110,58 @@ export default function Home() {
     }
   }, [hasStyle]);
 
+  useEffect(() => {
+    if (!state.referenceImagePreview && previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+      setUploadError(null);
+    }
+  }, [state.referenceImagePreview]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
   // ─── 文件处理 ────────────────────────────────────────────────────────────────
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!isSupportedImageType(file.type)) return;
+      setUploadError(null);
+      clearError();
+
+      if (!isSupportedImageType(file.type)) {
+        setUploadError("不支持的图片格式，请上传 JPG、PNG 或 WebP");
+        return;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUploadError("图片不能超过 10MB，请压缩后再试");
+        return;
+      }
+
       let processedFile = file;
       if (file.size > 2 * 1024 * 1024) {
         try {
           processedFile = await imageCompression(file, {
             maxSizeMB: 2, maxWidthOrHeight: 2048, useWebWorker: true,
           });
-        } catch { return; }
+        } catch {
+          setUploadError("图片压缩失败，请尝试更小的文件");
+          return;
+        }
       }
-      extractStyle(processedFile, URL.createObjectURL(processedFile));
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      const previewUrl = URL.createObjectURL(processedFile);
+      previewUrlRef.current = previewUrl;
+      extractStyle(processedFile, previewUrl);
     },
-    [extractStyle]
+    [clearError, extractStyle]
   );
 
   // 粘贴图片（Cmd+V / Ctrl+V）
@@ -320,9 +359,15 @@ export default function Home() {
             )}
           </div>
 
-          {state.error && state.loadingStage === null && isExtracting === false && !hasStyle && (
+          {step1Error && (
             <div className="px-5 pb-5">
-              <ErrorAlert message={state.error} onDismiss={clearError} />
+              <ErrorAlert
+                message={step1Error}
+                onDismiss={() => {
+                  setUploadError(null);
+                  clearError();
+                }}
+              />
             </div>
           )}
         </div>
@@ -709,6 +754,15 @@ export default function Home() {
               {state.error && !isGenerating && (
                 <div className="mt-4">
                   <ErrorAlert message={state.error} onDismiss={clearError} />
+                </div>
+              )}
+
+              {state.generationFailures > 0 && hasResults && !isGenerating && (
+                <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <i className="ri-alert-line text-sm text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs leading-relaxed text-amber-700">
+                    已成功生成 {state.resultImages.length} 张，另有 {state.generationFailures} 张失败。可点击「重新生成」重试。
+                  </p>
                 </div>
               )}
             </div>

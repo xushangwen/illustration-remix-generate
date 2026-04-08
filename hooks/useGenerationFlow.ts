@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useRef } from "react";
 import imageCompression from "browser-image-compression";
 import {
   AppState, AppAction,
@@ -8,7 +8,7 @@ import {
   ExtractStyleResponse, RefinePromptResponse,
 } from "@/lib/types";
 
-const initialState: AppState = {
+export const initialGenerationFlowState: AppState = {
   referenceImagePreview: null,
   referenceImageBase64: null,
   referenceImageMimeType: null,
@@ -26,11 +26,12 @@ const initialState: AppState = {
   backgroundCustomText: "",
   resultImages: [],
   pendingCount: 0,
+  generationFailures: 0,
   loadingStage: null,
   error: null,
 };
 
-function reducer(state: AppState, action: AppAction): AppState {
+export function generationFlowReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_LOADING_STAGE":
       return { ...state, loadingStage: action.payload, error: null };
@@ -38,10 +39,29 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, error: action.payload, loadingStage: null };
     case "CLEAR_ERROR":
       return { ...state, error: null };
-    case "SET_REFERENCE_IMAGE":
+    case "START_REFERENCE_UPLOAD":
       return {
         ...state,
         referenceImagePreview: action.payload.previewUrl,
+        referenceImageBase64: null,
+        referenceImageMimeType: null,
+        styleKeywords: [],
+        styleDescription: "",
+        styleDescriptionZh: "",
+        backgroundHints: [],
+        refinedPrompt: "",
+        refinedPromptZh: "",
+        finalPromptOverride: "",
+        backgroundCustomText: "",
+        resultImages: [],
+        pendingCount: 0,
+        generationFailures: 0,
+        loadingStage: "extract",
+        error: null,
+      };
+    case "SET_REFERENCE_IMAGE_DATA":
+      return {
+        ...state,
         referenceImageBase64: action.payload.base64,
         referenceImageMimeType: action.payload.mimeType,
       };
@@ -80,6 +100,7 @@ function reducer(state: AppState, action: AppAction): AppState {
         ...state,
         resultImages: [],
         pendingCount: action.payload,
+        generationFailures: 0,
         loadingStage: "generate",
         error: null,
       };
@@ -90,16 +111,25 @@ function reducer(state: AppState, action: AppAction): AppState {
         // 每收到一张，pending 减 1
         pendingCount: Math.max(0, state.pendingCount - 1),
       };
+    case "ADD_GENERATION_FAILURE":
+      return {
+        ...state,
+        generationFailures: state.generationFailures + 1,
+        pendingCount: Math.max(0, state.pendingCount - 1),
+      };
     case "FINISH_GENERATE":
       return {
         ...state,
         loadingStage: null,
         pendingCount: 0,
         // 如果全程没有成功图片，报错
-        error: state.resultImages.length === 0 ? "图片生成失败，请重试" : state.error,
+        error:
+          state.resultImages.length === 0
+            ? state.error ?? (state.generationFailures > 0 ? "图片生成失败，请重试" : null)
+            : state.error,
       };
     case "RESET":
-      return initialState;
+      return initialGenerationFlowState;
     default:
       return state;
   }
@@ -114,12 +144,57 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export function useGenerationFlow() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(generationFlowReducer, initialGenerationFlowState);
+  const extractRequestIdRef = useRef(0);
+  const promptRequestIdRef = useRef(0);
+  const generationRequestIdRef = useRef(0);
+  const extractAbortRef = useRef<AbortController | null>(null);
+  const promptAbortRef = useRef<AbortController | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
+
+  const abortExtract = useCallback(() => {
+    extractAbortRef.current?.abort();
+    extractAbortRef.current = null;
+    extractRequestIdRef.current += 1;
+    return extractRequestIdRef.current;
+  }, []);
+
+  const abortPrompt = useCallback(() => {
+    promptAbortRef.current?.abort();
+    promptAbortRef.current = null;
+    promptRequestIdRef.current += 1;
+    return promptRequestIdRef.current;
+  }, []);
+
+  const abortGeneration = useCallback(() => {
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    generationRequestIdRef.current += 1;
+    return generationRequestIdRef.current;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      abortExtract();
+      abortPrompt();
+      abortGeneration();
+    };
+  }, [abortExtract, abortPrompt, abortGeneration]);
 
   // 上传参考图 + 提取风格
   const extractStyle = useCallback(async (imageFile: File, previewUrl: string) => {
-    dispatch({ type: "SET_LOADING_STAGE", payload: "extract" });
+    const requestId = abortExtract();
+    abortPrompt();
+    abortGeneration();
+    const controller = new AbortController();
+    extractAbortRef.current = controller;
+
+    dispatch({ type: "START_REFERENCE_UPLOAD", payload: { previewUrl } });
 
     try {
       // 垫图压缩：风格参考不需要高分辨率
@@ -128,18 +203,22 @@ export function useGenerationFlow() {
         maxWidthOrHeight: 768,
         useWebWorker: true,
       });
+      if (requestId !== extractRequestIdRef.current) return;
+
       const base64 = await fileToBase64(refFile);
+      if (requestId !== extractRequestIdRef.current) return;
 
       dispatch({
-        type: "SET_REFERENCE_IMAGE",
-        payload: { previewUrl, base64, mimeType: refFile.type },
+        type: "SET_REFERENCE_IMAGE_DATA",
+        payload: { base64, mimeType: refFile.type },
       });
 
       const formData = new FormData();
       formData.append("image", imageFile);
 
-      const res = await fetch("/api/extract-style", { method: "POST", body: formData });
+      const res = await fetch("/api/extract-style", { method: "POST", body: formData, signal: controller.signal });
       const data = await res.json();
+      if (requestId !== extractRequestIdRef.current) return;
       if (!res.ok) throw new Error(data.error ?? "风格提取失败");
 
       const styleData = data as ExtractStyleResponse;
@@ -153,21 +232,31 @@ export function useGenerationFlow() {
         },
       });
     } catch (err) {
+      if (requestId !== extractRequestIdRef.current || isAbortError(err)) return;
       dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "风格提取失败" });
+    } finally {
+      if (requestId === extractRequestIdRef.current && extractAbortRef.current === controller) {
+        extractAbortRef.current = null;
+      }
     }
-  }, []);
+  }, [abortExtract, abortGeneration, abortPrompt]);
 
   // 将场景描述精化为英文生图 Prompt
   const refinePrompt = useCallback(
     async (userDescription: string) => {
+      const requestId = abortPrompt();
+      const controller = new AbortController();
+      promptAbortRef.current = controller;
       dispatch({ type: "SET_LOADING_STAGE", payload: "refine" });
       try {
         const res = await fetch("/api/refine-prompt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userDescription, styleKeywords: state.styleKeywords }),
+          signal: controller.signal,
         });
         const data = await res.json();
+        if (requestId !== promptRequestIdRef.current) return;
         if (!res.ok) throw new Error(data.error ?? "Prompt 精化失败");
         const refineData = data as RefinePromptResponse;
         dispatch({
@@ -175,16 +264,24 @@ export function useGenerationFlow() {
           payload: { prompt: refineData.refinedPrompt, promptZh: refineData.refinedPromptZh ?? "" },
         });
       } catch (err) {
+        if (requestId !== promptRequestIdRef.current || isAbortError(err)) return;
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "Prompt 精化失败" });
+      } finally {
+        if (requestId === promptRequestIdRef.current && promptAbortRef.current === controller) {
+          promptAbortRef.current = null;
+        }
       }
     },
-    [state.styleKeywords]
+    [abortPrompt, state.styleKeywords]
   );
 
   // 在已有 Prompt 基础上按用户描述修改
   const editPrompt = useCallback(
     async (editRequest: string) => {
       if (!state.refinedPrompt.trim()) return;
+      const requestId = abortPrompt();
+      const controller = new AbortController();
+      promptAbortRef.current = controller;
       dispatch({ type: "SET_LOADING_STAGE", payload: "edit" });
       try {
         const res = await fetch("/api/edit-prompt", {
@@ -195,8 +292,10 @@ export function useGenerationFlow() {
             editRequest,
             styleKeywords: state.styleKeywords,
           }),
+          signal: controller.signal,
         });
         const data = await res.json();
+        if (requestId !== promptRequestIdRef.current) return;
         if (!res.ok) throw new Error(data.error ?? "提示词优化失败");
         const editData = data as RefinePromptResponse;
         dispatch({
@@ -204,14 +303,27 @@ export function useGenerationFlow() {
           payload: { prompt: editData.refinedPrompt, promptZh: editData.refinedPromptZh ?? "" },
         });
       } catch (err) {
+        if (requestId !== promptRequestIdRef.current || isAbortError(err)) return;
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "提示词优化失败" });
+      } finally {
+        if (requestId === promptRequestIdRef.current && promptAbortRef.current === controller) {
+          promptAbortRef.current = null;
+        }
       }
     },
-    [state.refinedPrompt, state.styleKeywords]
+    [abortPrompt, state.refinedPrompt, state.styleKeywords]
   );
 
   // 并行批量生成图片，SSE 流式接收，逐张渲染
   const generateImage = useCallback(async () => {
+    if (!state.referenceImageBase64 || !state.referenceImageMimeType) {
+      dispatch({ type: "SET_ERROR", payload: "缺少参考图数据，请重新上传参考图" });
+      return;
+    }
+
+    const requestId = abortGeneration();
+    const controller = new AbortController();
+    generationAbortRef.current = controller;
     dispatch({ type: "START_GENERATE", payload: state.imageCount });
 
     try {
@@ -233,6 +345,7 @@ export function useGenerationFlow() {
           // 若用户在预览卡片中手动修改了最终指令，优先使用覆盖值
           finalPromptOverride: state.finalPromptOverride || undefined,
         }),
+        signal: controller.signal,
       });
 
       // 如果不是流（比如参数验证失败返回 JSON 错误），走普通错误处理
@@ -266,11 +379,14 @@ export function useGenerationFlow() {
               mimeType?: string;
               error?: string;
             };
+            if (requestId !== generationRequestIdRef.current) return;
             if (parsed.imageBase64 && parsed.mimeType) {
               dispatch({
                 type: "ADD_RESULT_IMAGE",
                 payload: { base64: parsed.imageBase64, mimeType: parsed.mimeType },
               });
+            } else if (parsed.error) {
+              dispatch({ type: "ADD_GENERATION_FAILURE" });
             }
           } catch {
             // 解析单条 SSE 消息失败，跳过
@@ -278,11 +394,18 @@ export function useGenerationFlow() {
         }
       }
     } catch (err) {
+      if (requestId !== generationRequestIdRef.current || isAbortError(err)) return;
       dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "图片生成失败" });
     } finally {
-      dispatch({ type: "FINISH_GENERATE" });
+      if (requestId === generationRequestIdRef.current) {
+        dispatch({ type: "FINISH_GENERATE" });
+        if (generationAbortRef.current === controller) {
+          generationAbortRef.current = null;
+        }
+      }
     }
   }, [
+    abortGeneration,
     state.refinedPrompt,
     state.styleKeywords,
     state.styleDescription,
@@ -315,7 +438,12 @@ export function useGenerationFlow() {
   const setBackgroundMode = useCallback((m: BackgroundMode) => dispatch({ type: "SET_BACKGROUND_MODE", payload: m }), []);
   const setBackgroundCustomText = useCallback((t: string) => dispatch({ type: "SET_BACKGROUND_CUSTOM_TEXT", payload: t }), []);
   const clearError = useCallback(() => dispatch({ type: "CLEAR_ERROR" }), []);
-  const reset = useCallback(() => dispatch({ type: "RESET" }), []);
+  const reset = useCallback(() => {
+    abortExtract();
+    abortPrompt();
+    abortGeneration();
+    dispatch({ type: "RESET" });
+  }, [abortExtract, abortGeneration, abortPrompt]);
 
   return {
     state,

@@ -4,10 +4,10 @@ export const SUPPORTED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
 ] as const;
 
 export type SupportedMimeType = (typeof SUPPORTED_MIME_TYPES)[number];
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 /**
  * 检查文件类型是否受 Gemini API 支持
@@ -33,7 +33,6 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
-  "image/gif": "gif",
 };
 
 /**

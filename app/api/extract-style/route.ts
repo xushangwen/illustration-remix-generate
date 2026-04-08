@@ -1,6 +1,6 @@
 import { getGenAI, VISION_MODEL } from "@/lib/gemini";
 import { STYLE_EXTRACTION_PROMPT } from "@/lib/prompts";
-import { safeParseJSON, isSupportedImageType } from "@/lib/image-utils";
+import { safeParseJSON, isSupportedImageType, MAX_UPLOAD_BYTES } from "@/lib/image-utils";
 import { ExtractStyleResponse } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -15,6 +15,13 @@ export async function POST(request: Request) {
     if (!isSupportedImageType(imageFile.type)) {
       return Response.json(
         { error: "不支持的图片格式，请上传 JPG、PNG 或 WebP" },
+        { status: 400 }
+      );
+    }
+
+    if (imageFile.size > MAX_UPLOAD_BYTES) {
+      return Response.json(
+        { error: "图片不能超过 10MB，请压缩后再试" },
         { status: 400 }
       );
     }

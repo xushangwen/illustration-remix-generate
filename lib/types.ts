@@ -39,6 +39,7 @@ export interface AppState {
   // 生成结果
   resultImages: ResultImage[];
   pendingCount: number;
+  generationFailures: number;
   // 通用
   loadingStage: LoadingStage;
   error: string | null;
@@ -48,7 +49,8 @@ export type AppAction =
   | { type: "SET_LOADING_STAGE"; payload: LoadingStage }
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "CLEAR_ERROR" }
-  | { type: "SET_REFERENCE_IMAGE"; payload: { previewUrl: string; base64: string; mimeType: string } }
+  | { type: "START_REFERENCE_UPLOAD"; payload: { previewUrl: string } }
+  | { type: "SET_REFERENCE_IMAGE_DATA"; payload: { base64: string; mimeType: string } }
   | { type: "SET_STYLE_RESULT"; payload: { keywords: string[]; description: string; descriptionZh: string; backgroundHints: string[] } }
   | { type: "SET_REFINED_PROMPT"; payload: { prompt: string; promptZh: string } }
   | { type: "SET_FINAL_PROMPT_OVERRIDE"; payload: string }
@@ -59,6 +61,7 @@ export type AppAction =
   | { type: "SET_BACKGROUND_CUSTOM_TEXT"; payload: string }
   | { type: "START_GENERATE"; payload: number }
   | { type: "ADD_RESULT_IMAGE"; payload: ResultImage }
+  | { type: "ADD_GENERATION_FAILURE" }
   | { type: "FINISH_GENERATE" }
   | { type: "RESET" };
 
