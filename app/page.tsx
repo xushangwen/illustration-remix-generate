@@ -12,24 +12,24 @@ export default function Home() {
     state,
     extractStyle,
     refinePrompt,
+    editPrompt,
     generateImage,
     setRefinedPrompt,
     setAspectRatio,
+    setImageResolution,
+    setImageCount,
     goToStep,
     reset,
   } = useGenerationFlow();
 
-  const clearError = useCallback(() => {
-    // 通过 dispatch SET_ERROR null 清除错误
-    // 这里直接利用 goToStep 同一步骤来清除 error（reducer 会重置 error）
-  }, []);
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const clearError = useCallback(() => {}, []);
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* 顶部 Header */}
       <header className="border-b border-neutral-200 bg-white">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* 点击 logo 区域回到初始状态，step=1 时无需 reset */}
           <button
             onClick={() => state.step !== 1 && reset()}
             className="flex items-center gap-2.5 group"
@@ -47,10 +47,8 @@ export default function Home() {
       {/* 主内容区 */}
       <main className="flex-1 flex flex-col items-center py-10 px-6">
         <div className="w-full max-w-2xl flex flex-col gap-8">
-          {/* 步骤指示器 */}
           <StepIndicator currentStep={state.step} />
 
-          {/* 步骤内容卡片 */}
           <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm">
             {state.step === 1 && (
               <Step1Upload
@@ -72,9 +70,14 @@ export default function Home() {
                 userDescription={state.userDescription}
                 refinedPrompt={state.refinedPrompt}
                 aspectRatio={state.aspectRatio}
+                imageResolution={state.imageResolution}
+                imageCount={state.imageCount}
                 onRefinePrompt={refinePrompt}
+                onEditPrompt={editPrompt}
                 onRefinedPromptChange={setRefinedPrompt}
                 onAspectRatioChange={setAspectRatio}
+                onImageResolutionChange={setImageResolution}
+                onImageCountChange={setImageCount}
                 onGenerate={async () => {
                   goToStep(3);
                   await generateImage();
@@ -88,8 +91,8 @@ export default function Home() {
               <Step3Result
                 loading={state.loading}
                 error={state.error}
-                resultImageBase64={state.resultImageBase64}
-                resultMimeType={state.resultMimeType}
+                resultImages={state.resultImages}
+                imageCount={state.imageCount}
                 onRegenerate={generateImage}
                 onReset={reset}
                 onClearError={clearError}

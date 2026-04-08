@@ -57,6 +57,40 @@ Return ONLY the refined prompt text, nothing else.`;
 }
 
 /**
+ * Step 2 扩展: 在已有 refinedPrompt 基础上，按用户描述修改
+ * 保留不变的部分，只更改用户明确要求的内容
+ */
+export function buildEditPromptTemplate(
+  currentPrompt: string,
+  editRequest: string,
+  styleKeywords: string[]
+): string {
+  return `You are an expert at refining image generation prompts for illustration.
+
+Current prompt:
+"${currentPrompt}"
+
+Style keywords from reference image: ${styleKeywords.join(", ")}
+
+User's modification request (may be in Chinese or English): "${editRequest}"
+
+Your task:
+1. Understand the user's modification intent precisely
+2. Modify the current prompt according to the request only
+3. Keep all unchanged parts intact — only modify what was explicitly requested
+4. Maintain the same level of detail and style compatibility
+
+Requirements:
+- 2-4 sentences, written as a direct visual description
+- Include: main subject, action/pose, environment/setting, lighting, mood/atmosphere
+- Do NOT include the style keywords (they will be appended separately)
+- Do NOT include instructions like "generate" or "create"
+- Do NOT add quotation marks or explanation
+
+Return ONLY the modified prompt text, nothing else.`;
+}
+
+/**
  * Step 3: 生图 Prompt —— 垫图模式（参考图 + 文字双重约束）
  * 当提供参考图时，在 multimodal contents 中将参考图置于首位，
  * 文字 Prompt 明确要求模型严格复刻其视觉风格

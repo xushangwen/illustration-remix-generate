@@ -1,16 +1,15 @@
 import { getGenAI, IMAGE_GEN_MODEL } from "@/lib/gemini";
 import { buildFinalImagePromptWithReference } from "@/lib/prompts";
-import { GenerateImageResponse, AspectRatio } from "@/lib/types";
+import { GenerateImagesResponse, AspectRatio, ImageResolution, ImageCount } from "@/lib/types";
 import type { GoogleGenAI } from "@google/genai";
 
-// Vercel 部署时允许最多 120 秒超时（2K 图片生成较慢）
-export const maxDuration = 120;
+// 批量生成最多 4 张 4K 图片，保留充足时间
+export const maxDuration = 180;
 
 type GenerateParams = Parameters<GoogleGenAI["models"]["generateContent"]>[0];
 
 /**
- * 带指数退避的重试包装
- * 针对网络抖动或 Gemini 偶发 500，最多重试 2 次
+ * 带指数退避的单次生成（针对偶发网络抖动或 Gemini 500）
  */
 async function generateWithRetry(params: GenerateParams, maxRetries = 2) {
   let lastError: unknown;
@@ -20,13 +19,34 @@ async function generateWithRetry(params: GenerateParams, maxRetries = 2) {
     } catch (err) {
       lastError = err;
       if (attempt < maxRetries) {
-        // 退避：首次 5s，第二次 10s
         await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
         console.warn(`[generate-image] 第 ${attempt + 1} 次失败，重试...`, err);
       }
     }
   }
   throw lastError;
+}
+
+/**
+ * 从 Gemini 响应中提取图片数据
+ * 返回 null 表示该次生成未产出图片
+ */
+function extractImageFromResponse(response: Awaited<ReturnType<GoogleGenAI["models"]["generateContent"]>>): {
+  imageBase64: string;
+  mimeType: string;
+} | null {
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return {
+        imageBase64: part.inlineData.data,
+        mimeType: part.inlineData.mimeType ?? "image/png",
+      };
+    }
+  }
+  const textPart = parts.find((p) => p.text)?.text;
+  console.error("[generate-image] 未获取到图片，模型返回:", textPart);
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -37,6 +57,8 @@ export async function POST(request: Request) {
       styleKeywords,
       styleDescription,
       aspectRatio,
+      imageResolution,
+      imageCount,
       referenceImageBase64,
       referenceImageMimeType,
     } = body as {
@@ -44,6 +66,8 @@ export async function POST(request: Request) {
       styleKeywords: string[];
       styleDescription: string;
       aspectRatio: AspectRatio;
+      imageResolution: ImageResolution;
+      imageCount: ImageCount;
       referenceImageBase64: string | null;
       referenceImageMimeType: string | null;
     };
@@ -51,6 +75,9 @@ export async function POST(request: Request) {
     if (!refinedPrompt?.trim()) {
       return Response.json({ error: "缺少生图 Prompt，请先完成前两步" }, { status: 400 });
     }
+
+    const count = imageCount ?? 1;
+    const resolution = imageResolution ?? "2K";
 
     const textPrompt = buildFinalImagePromptWithReference(refinedPrompt, styleKeywords, styleDescription);
 
@@ -66,41 +93,35 @@ export async function POST(request: Request) {
     }
     parts.push({ text: textPrompt });
 
-    const response = await generateWithRetry({
+    const generateParams: GenerateParams = {
       model: IMAGE_GEN_MODEL,
       contents: [{ role: "user", parts }],
       config: {
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: {
           aspectRatio: aspectRatio,
-          imageSize: "2K",
+          imageSize: resolution,
         },
       } as GenerateParams["config"],
-    });
+    };
 
-    // 从响应中提取图片数据
-    const responseParts = response.candidates?.[0]?.content?.parts ?? [];
-    let imageBase64: string | null = null;
-    let mimeType = "image/png";
+    // 并行生成 count 张图片，部分失败不阻断整体返回
+    const settled = await Promise.allSettled(
+      Array.from({ length: count }, () => generateWithRetry(generateParams))
+    );
 
-    for (const part of responseParts) {
-      if (part.inlineData?.data) {
-        imageBase64 = part.inlineData.data;
-        mimeType = part.inlineData.mimeType ?? "image/png";
-        break;
-      }
+    const images = settled
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<GoogleGenAI["models"]["generateContent"]>>> =>
+        r.status === "fulfilled"
+      )
+      .map((r) => extractImageFromResponse(r.value))
+      .filter((img): img is NonNullable<typeof img> => img !== null);
+
+    if (images.length === 0) {
+      throw new Error("图片生成失败，所有请求均未返回图片数据");
     }
 
-    if (!imageBase64) {
-      const textPart = responseParts.find((p) => p.text)?.text;
-      console.error("[generate-image] 未获取到图片，模型返回:", textPart);
-      throw new Error("图片生成失败，模型未返回图片数据");
-    }
-
-    return Response.json({
-      imageBase64,
-      mimeType,
-    } satisfies GenerateImageResponse);
+    return Response.json({ images } satisfies GenerateImagesResponse);
   } catch (error) {
     console.error("[generate-image]", error);
     const message = error instanceof Error ? error.message : "图片生成失败，请重试";

@@ -16,5 +16,6 @@ export function getGenAI(): GoogleGenAI {
   return _genai;
 }
 
-export const VISION_MODEL = "gemini-3.1-flash-lite-preview";
+// 图片分析/提示词精化：最新 Pro 预览版，理解力更强
+export const VISION_MODEL = "gemini-3.1-pro-preview";
 export const IMAGE_GEN_MODEL = "gemini-3.1-flash-image-preview";
