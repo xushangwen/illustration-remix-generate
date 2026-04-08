@@ -3,39 +3,35 @@
 import { useReducer, useCallback } from "react";
 import imageCompression from "browser-image-compression";
 import {
-  GenerationFlowState,
-  GenerationFlowAction,
-  AspectRatio,
-  ImageResolution,
-  ImageCount,
-  ExtractStyleResponse,
-  RefinePromptResponse,
-  GenerateImagesResponse,
+  AppState, AppAction,
+  AspectRatio, ImageResolution, ImageCount,
+  ExtractStyleResponse, RefinePromptResponse,
 } from "@/lib/types";
 
-const initialState: GenerationFlowState = {
-  step: 1,
+const initialState: AppState = {
   referenceImagePreview: null,
   referenceImageBase64: null,
   referenceImageMimeType: null,
   styleKeywords: [],
   styleDescription: "",
-  userDescription: "",
   refinedPrompt: "",
-  aspectRatio: "16:9",
+  aspectRatio: "1:1",
   imageResolution: "2K",
   imageCount: 1,
   resultImages: [],
-  loading: false,
+  pendingCount: 0,
+  loadingStage: null,
   error: null,
 };
 
-function reducer(state: GenerationFlowState, action: GenerationFlowAction): GenerationFlowState {
+function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case "SET_LOADING":
-      return { ...state, loading: action.payload, error: null };
+    case "SET_LOADING_STAGE":
+      return { ...state, loadingStage: action.payload, error: null };
     case "SET_ERROR":
-      return { ...state, error: action.payload, loading: false };
+      return { ...state, error: action.payload, loadingStage: null };
+    case "CLEAR_ERROR":
+      return { ...state, error: null };
     case "SET_REFERENCE_IMAGE":
       return {
         ...state,
@@ -48,28 +44,39 @@ function reducer(state: GenerationFlowState, action: GenerationFlowAction): Gene
         ...state,
         styleKeywords: action.payload.keywords,
         styleDescription: action.payload.description,
-        loading: false,
-        step: 2,
+        loadingStage: null,
       };
-    case "SET_USER_DESCRIPTION":
-      return { ...state, userDescription: action.payload };
     case "SET_REFINED_PROMPT":
-      return { ...state, refinedPrompt: action.payload, loading: false };
+      return { ...state, refinedPrompt: action.payload, loadingStage: null };
     case "SET_ASPECT_RATIO":
       return { ...state, aspectRatio: action.payload };
     case "SET_IMAGE_RESOLUTION":
       return { ...state, imageResolution: action.payload };
     case "SET_IMAGE_COUNT":
       return { ...state, imageCount: action.payload };
-    case "SET_RESULT_IMAGES":
+    case "START_GENERATE":
       return {
         ...state,
-        resultImages: action.payload,
-        loading: false,
-        step: 3,
+        resultImages: [],
+        pendingCount: action.payload,
+        loadingStage: "generate",
+        error: null,
       };
-    case "GO_TO_STEP":
-      return { ...state, step: action.payload, error: null };
+    case "ADD_RESULT_IMAGE":
+      return {
+        ...state,
+        resultImages: [...state.resultImages, action.payload],
+        // 每收到一张，pending 减 1
+        pendingCount: Math.max(0, state.pendingCount - 1),
+      };
+    case "FINISH_GENERATE":
+      return {
+        ...state,
+        loadingStage: null,
+        pendingCount: 0,
+        // 如果全程没有成功图片，报错
+        error: state.resultImages.length === 0 ? "图片生成失败，请重试" : state.error,
+      };
     case "RESET":
       return initialState;
     default:
@@ -77,16 +84,10 @@ function reducer(state: GenerationFlowState, action: GenerationFlowAction): Gene
   }
 }
 
-/**
- * 将 File 对象转为 base64 字符串（客户端，使用 FileReader）
- */
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      resolve(dataUrl.split(",")[1]);
-    };
+    reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -95,22 +96,22 @@ function fileToBase64(file: File): Promise<string> {
 export function useGenerationFlow() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Step 1: 上传图片并提取风格
+  // 上传参考图 + 提取风格
   const extractStyle = useCallback(async (imageFile: File, previewUrl: string) => {
-    dispatch({ type: "SET_LOADING", payload: true });
+    dispatch({ type: "SET_LOADING_STAGE", payload: "extract" });
 
     try {
-      // 垫图压到 300KB/768px，减少请求体体积
-      const styleRefFile = await imageCompression(imageFile, {
+      // 垫图压缩：风格参考不需要高分辨率
+      const refFile = await imageCompression(imageFile, {
         maxSizeMB: 0.3,
         maxWidthOrHeight: 768,
         useWebWorker: true,
       });
-      const base64 = await fileToBase64(styleRefFile);
+      const base64 = await fileToBase64(refFile);
 
       dispatch({
         type: "SET_REFERENCE_IMAGE",
-        payload: { previewUrl, base64, mimeType: styleRefFile.type },
+        payload: { previewUrl, base64, mimeType: refFile.type },
       });
 
       const formData = new FormData();
@@ -126,22 +127,18 @@ export function useGenerationFlow() {
     }
   }, []);
 
-  // Step 2: 精化场景描述 → 生成 refinedPrompt
+  // 将场景描述精化为英文生图 Prompt
   const refinePrompt = useCallback(
     async (userDescription: string) => {
-      dispatch({ type: "SET_USER_DESCRIPTION", payload: userDescription });
-      dispatch({ type: "SET_LOADING", payload: true });
-
+      dispatch({ type: "SET_LOADING_STAGE", payload: "refine" });
       try {
         const res = await fetch("/api/refine-prompt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userDescription, styleKeywords: state.styleKeywords }),
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Prompt 精化失败");
-
         dispatch({ type: "SET_REFINED_PROMPT", payload: (data as RefinePromptResponse).refinedPrompt });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "Prompt 精化失败" });
@@ -150,12 +147,11 @@ export function useGenerationFlow() {
     [state.styleKeywords]
   );
 
-  // Step 2 扩展: 在已有 refinedPrompt 基础上按用户描述修改
+  // 在已有 Prompt 基础上按用户描述修改
   const editPrompt = useCallback(
     async (editRequest: string) => {
       if (!state.refinedPrompt.trim()) return;
-      dispatch({ type: "SET_LOADING", payload: true });
-
+      dispatch({ type: "SET_LOADING_STAGE", payload: "edit" });
       try {
         const res = await fetch("/api/edit-prompt", {
           method: "POST",
@@ -166,10 +162,8 @@ export function useGenerationFlow() {
             styleKeywords: state.styleKeywords,
           }),
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "提示词优化失败");
-
         dispatch({ type: "SET_REFINED_PROMPT", payload: (data as RefinePromptResponse).refinedPrompt });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "提示词优化失败" });
@@ -178,9 +172,9 @@ export function useGenerationFlow() {
     [state.refinedPrompt, state.styleKeywords]
   );
 
-  // Step 3: 并行批量生成图片
+  // 并行批量生成图片，SSE 流式接收，逐张渲染
   const generateImage = useCallback(async () => {
-    dispatch({ type: "SET_LOADING", payload: true });
+    dispatch({ type: "START_GENERATE", payload: state.imageCount });
 
     try {
       const res = await fetch("/api/generate-image", {
@@ -198,16 +192,52 @@ export function useGenerationFlow() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "图片生成失败");
+      // 如果不是流（比如参数验证失败返回 JSON 错误），走普通错误处理
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "图片生成失败");
+      }
 
-      const { images } = data as GenerateImagesResponse;
-      dispatch({
-        type: "SET_RESULT_IMAGES",
-        payload: images.map((img) => ({ base64: img.imageBase64, mimeType: img.mimeType })),
-      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        // SSE 每条消息以 \n\n 结尾
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          const dataStr = line.slice(6).trim();
+          if (dataStr === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(dataStr) as {
+              imageBase64?: string;
+              mimeType?: string;
+              error?: string;
+            };
+            if (parsed.imageBase64 && parsed.mimeType) {
+              dispatch({
+                type: "ADD_RESULT_IMAGE",
+                payload: { base64: parsed.imageBase64, mimeType: parsed.mimeType },
+              });
+            }
+          } catch {
+            // 解析单条 SSE 消息失败，跳过
+          }
+        }
+      }
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "图片生成失败" });
+    } finally {
+      dispatch({ type: "FINISH_GENERATE" });
     }
   }, [
     state.refinedPrompt,
@@ -220,29 +250,12 @@ export function useGenerationFlow() {
     state.referenceImageMimeType,
   ]);
 
-  const setRefinedPrompt = useCallback((prompt: string) => {
-    dispatch({ type: "SET_REFINED_PROMPT", payload: prompt });
-  }, []);
-
-  const setAspectRatio = useCallback((ratio: AspectRatio) => {
-    dispatch({ type: "SET_ASPECT_RATIO", payload: ratio });
-  }, []);
-
-  const setImageResolution = useCallback((resolution: ImageResolution) => {
-    dispatch({ type: "SET_IMAGE_RESOLUTION", payload: resolution });
-  }, []);
-
-  const setImageCount = useCallback((count: ImageCount) => {
-    dispatch({ type: "SET_IMAGE_COUNT", payload: count });
-  }, []);
-
-  const goToStep = useCallback((step: 1 | 2 | 3) => {
-    dispatch({ type: "GO_TO_STEP", payload: step });
-  }, []);
-
-  const reset = useCallback(() => {
-    dispatch({ type: "RESET" });
-  }, []);
+  const setRefinedPrompt = useCallback((p: string) => dispatch({ type: "SET_REFINED_PROMPT", payload: p }), []);
+  const setAspectRatio = useCallback((r: AspectRatio) => dispatch({ type: "SET_ASPECT_RATIO", payload: r }), []);
+  const setImageResolution = useCallback((r: ImageResolution) => dispatch({ type: "SET_IMAGE_RESOLUTION", payload: r }), []);
+  const setImageCount = useCallback((c: ImageCount) => dispatch({ type: "SET_IMAGE_COUNT", payload: c }), []);
+  const clearError = useCallback(() => dispatch({ type: "CLEAR_ERROR" }), []);
+  const reset = useCallback(() => dispatch({ type: "RESET" }), []);
 
   return {
     state,
@@ -254,7 +267,7 @@ export function useGenerationFlow() {
     setAspectRatio,
     setImageResolution,
     setImageCount,
-    goToStep,
+    clearError,
     reset,
   };
 }
