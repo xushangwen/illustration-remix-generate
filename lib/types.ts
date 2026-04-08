@@ -28,6 +28,8 @@ export interface AppState {
   // 生图描述（含中文对照）
   refinedPrompt: string;
   refinedPromptZh: string;
+  // 用户在"最终指令"卡片中手动修改的完整融合提示词（优先级高于自动计算值）
+  finalPromptOverride: string;
   // 生成设置
   aspectRatio: AspectRatio;
   imageResolution: ImageResolution;
@@ -49,6 +51,7 @@ export type AppAction =
   | { type: "SET_REFERENCE_IMAGE"; payload: { previewUrl: string; base64: string; mimeType: string } }
   | { type: "SET_STYLE_RESULT"; payload: { keywords: string[]; description: string; descriptionZh: string; backgroundHints: string[] } }
   | { type: "SET_REFINED_PROMPT"; payload: { prompt: string; promptZh: string } }
+  | { type: "SET_FINAL_PROMPT_OVERRIDE"; payload: string }
   | { type: "SET_ASPECT_RATIO"; payload: AspectRatio }
   | { type: "SET_IMAGE_RESOLUTION"; payload: ImageResolution }
   | { type: "SET_IMAGE_COUNT"; payload: ImageCount }

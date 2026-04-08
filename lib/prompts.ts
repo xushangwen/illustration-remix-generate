@@ -40,21 +40,23 @@ export function buildRefinePromptTemplate(
   userDescription: string,
   styleKeywords: string[]
 ): string {
-  return `You are an expert at converting casual scene descriptions into precise image generation prompts for illustration.
+  return `You are a professional translator and copy editor for image generation prompts. Your job is to faithfully translate the user's description into clean English — nothing more.
 
-Style keywords from reference image: ${styleKeywords.join(", ")}
+Style keywords from reference image (for context only, do NOT inject them into the prompt): ${styleKeywords.join(", ")}
 
-User's casual description (may be in Chinese or English): "${userDescription}"
+User's description (may be in Chinese or English): "${userDescription}"
 
-Your task:
-1. Deeply understand the user's intent — including implied mood, subject relationships, setting, and atmosphere
-2. Expand vague references into specific, visually concrete elements
-3. Output results in JSON format with both English prompt and Chinese explanation
+CRITICAL RULES:
+1. Preserve the user's EXACT intent — do NOT add anything they didn't say
+2. Do NOT add mood, atmosphere, lighting, background, props, or extra details the user didn't mention
+3. Do NOT expand "beer glass" into "a frosty beer glass on a wooden table with warm light" — just say "a beer glass"
+4. Only fix grammar, clarity, and phrasing — translate faithfully if input is Chinese
+5. Keep it concise and precise — 1-2 sentences maximum
 
 Return ONLY valid JSON in this exact format, no markdown, no explanation:
 {
-  "prompt": "The refined English image generation prompt (2-4 sentences, direct visual description, include: main subject, action/pose, environment/setting, lighting, mood, framing. Do NOT include style keywords or instructions like generate/create.)",
-  "promptZh": "用自然中文描述画面内容（同 prompt 对应，方便用户确认意图是否正确，无需逐字翻译，但要准确传达画面）"
+  "prompt": "The clean English description of exactly what the user described (1-2 sentences max, no added creative elements, no style keywords)",
+  "promptZh": "用简洁中文还原用户描述的内容（方便用户确认 AI 是否理解正确，不要增加原描述没有的内容）"
 }
 
 Output ONLY the JSON object. Do not wrap in code blocks.`;
@@ -77,11 +79,10 @@ Style keywords from reference image: ${styleKeywords.join(", ")}
 
 User's modification request (may be in Chinese or English): "${editRequest}"
 
-Your task:
-1. Understand the user's modification intent precisely
-2. Modify the current prompt according to the request only
-3. Keep all unchanged parts intact — only modify what was explicitly requested
-4. Maintain the same level of detail and style compatibility
+CRITICAL RULES:
+1. Modify ONLY what the user explicitly asked to change — leave everything else word-for-word intact
+2. Do NOT add extra details, mood, atmosphere, or creative elements not requested
+3. Do NOT expand or elaborate the unchanged parts
 
 Return ONLY valid JSON in this exact format, no markdown, no explanation:
 {

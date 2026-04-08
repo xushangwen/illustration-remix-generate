@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     backgroundHints: string[];
     referenceImageBase64: string | null;
     referenceImageMimeType: string | null;
+    finalPromptOverride?: string;
   };
 
   try {
@@ -61,23 +62,27 @@ export async function POST(request: Request) {
     aspectRatio, imageResolution, imageCount,
     backgroundMode, backgroundCustomText, backgroundHints,
     referenceImageBase64, referenceImageMimeType,
+    finalPromptOverride,
   } = body;
 
-  if (!refinedPrompt?.trim()) {
+  if (!refinedPrompt?.trim() && !finalPromptOverride?.trim()) {
     return Response.json({ error: "缺少生图 Prompt" }, { status: 400 });
   }
 
   const count = imageCount ?? 1;
   const resolution = imageResolution ?? "2K";
 
-  const textPrompt = buildFinalImagePromptWithReference(
-    refinedPrompt,
-    styleKeywords,
-    styleDescription,
-    backgroundMode ?? "reference",
-    backgroundCustomText ?? "",
-    backgroundHints ?? []
-  );
+  // 若用户在预览卡片中手动修改了最终指令，直接使用；否则自动计算
+  const textPrompt = finalPromptOverride?.trim()
+    ? finalPromptOverride.trim()
+    : buildFinalImagePromptWithReference(
+        refinedPrompt,
+        styleKeywords,
+        styleDescription,
+        backgroundMode ?? "reference",
+        backgroundCustomText ?? "",
+        backgroundHints ?? []
+      );
 
   const parts: object[] = [];
   if (referenceImageBase64 && referenceImageMimeType) {

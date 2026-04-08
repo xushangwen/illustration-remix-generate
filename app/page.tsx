@@ -7,6 +7,7 @@ import { KeywordBadge } from "@/components/ui/KeywordBadge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { isSupportedImageType, downloadBase64Image, generateFileName } from "@/lib/image-utils";
 import { useGenerationFlow } from "@/hooks/useGenerationFlow";
+import { buildFinalImagePromptWithReference } from "@/lib/prompts";
 import type { AspectRatio, ImageResolution, ImageCount, BackgroundMode } from "@/lib/types";
 
 // ─── 选项配置 ────────────────────────────────────────────────────────────────
@@ -42,7 +43,8 @@ export default function Home() {
   const {
     state,
     extractStyle, refinePrompt, editPrompt, generateImage,
-    setRefinedPrompt, setAspectRatio, setImageResolution, setImageCount,
+    setRefinedPrompt, setFinalPromptOverride,
+    setAspectRatio, setImageResolution, setImageCount,
     setBackgroundMode, setBackgroundCustomText,
     clearError, reset,
   } = useGenerationFlow();
@@ -62,6 +64,21 @@ export default function Home() {
   const hasPrompt    = !!state.refinedPrompt;
   const hasResults   = state.resultImages.length > 0;
   const canGenerate  = hasPrompt && !isGenerating && !isRefining;
+
+  // 客户端实时计算最终融合提示词，供预览卡片展示
+  // 背景设置变更时自动重新计算；若用户已手动修改则显示手动值
+  const computedFinalPrompt = hasPrompt
+    ? buildFinalImagePromptWithReference(
+        state.refinedPrompt,
+        state.styleKeywords,
+        state.styleDescription,
+        state.backgroundMode,
+        state.backgroundCustomText,
+        state.backgroundHints
+      )
+    : "";
+  const displayFinalPrompt = state.finalPromptOverride || computedFinalPrompt;
+  const isFinalPromptModified = !!state.finalPromptOverride && state.finalPromptOverride !== computedFinalPrompt;
 
   // 风格提取结果 → 可复制的提示词字符串
   const stylePromptText = hasStyle
@@ -346,7 +363,7 @@ export default function Home() {
                     ) : (
                       <>
                         <i className="ri-magic-line" />
-                        AI 生成指令
+                        优化措辞
                         <span className="text-xs opacity-40">⌘↵</span>
                       </>
                     )}
@@ -358,7 +375,7 @@ export default function Home() {
               {hasPrompt && (
                 <>
                   <div className="border-t border-neutral-100 pt-4 flex flex-col gap-2">
-                    <p className="text-xs font-medium text-neutral-400">生图指令（可直接编辑）</p>
+                    <p className="text-xs font-medium text-neutral-400">场景描述（英文，可直接编辑）</p>
                     <textarea
                       value={state.refinedPrompt}
                       onChange={(e) => setRefinedPrompt(e.target.value)}
@@ -382,7 +399,7 @@ export default function Home() {
                       value={editRequest}
                       onChange={(e) => setEditRequest(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && !isRefining && handleEdit()}
-                      placeholder="继续修改：把主角换成机器人，或加上雪景..."
+                      placeholder="修改描述：把主角换成机器人、去掉背景里的树..."
                       disabled={isRefining}
                       className="flex-1 px-4 py-2.5 text-sm text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:opacity-60"
                     />
@@ -409,11 +426,97 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Card 3：生成设置 + CTA ──────────────────────────────────────── */}
+        {/* ── Card 3：最终生图指令预览 ───────────────────────────────────── */}
+        {hasPrompt && (
+          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
+            <div className="px-5 pt-5 pb-1 flex items-center justify-between">
+              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">03 · 最终生图指令</p>
+              {isFinalPromptModified && (
+                <button
+                  onClick={() => setFinalPromptOverride("")}
+                  className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors flex items-center gap-1"
+                >
+                  <i className="ri-refresh-line text-xs" />
+                  恢复自动
+                </button>
+              )}
+            </div>
+
+            <div className="p-5 flex flex-col gap-3">
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                这是风格 + 场景描述 + 背景设置融合后、最终发送给 AI 的完整指令。确认无误后点击生成。
+              </p>
+
+              {/* 完整指令（可编辑）*/}
+              <textarea
+                value={displayFinalPrompt}
+                onChange={(e) => setFinalPromptOverride(e.target.value)}
+                rows={8}
+                disabled={isGenerating}
+                className={`w-full px-4 py-3 text-xs text-neutral-700 bg-neutral-50 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all font-mono leading-relaxed disabled:opacity-60 ${
+                  isFinalPromptModified ? "border-amber-300 bg-amber-50/30" : "border-neutral-200"
+                }`}
+              />
+
+              {/* 中文参考摘要 */}
+              {(state.styleDescriptionZh || state.refinedPromptZh) && (
+                <div className="flex gap-2 px-3 py-2.5 bg-neutral-50 border border-neutral-100 rounded-lg">
+                  <span className="text-xs text-neutral-300 shrink-0 mt-0.5">中文</span>
+                  <div className="flex flex-col gap-1">
+                    {state.styleDescriptionZh && (
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        <span className="text-neutral-300 mr-1">风格</span>{state.styleDescriptionZh}
+                      </p>
+                    )}
+                    {state.refinedPromptZh && (
+                      <p className="text-xs text-neutral-500 leading-relaxed">
+                        <span className="text-neutral-300 mr-1">画面</span>{state.refinedPromptZh}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isFinalPromptModified && (
+                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                  <i className="ri-edit-line" />
+                  已手动修改，将直接使用此指令生成，不再自动计算
+                </p>
+              )}
+
+              {/* 生成按钮 */}
+              <button
+                onClick={generateImage}
+                disabled={!canGenerate}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-neutral-800 text-white text-sm font-semibold rounded-xl hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    生成中
+                    {state.resultImages.length > 0 && (
+                      <span className="text-white/70">
+                        （{state.resultImages.length}/{state.imageCount}）
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-sparkling-2-line text-base" />
+                    生成插画
+                    {state.imageCount > 1 && <span className="text-white/70">× {state.imageCount}</span>}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Card 4：生成设置 ────────────────────────────────────────────── */}
         {hasStyle && (
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
             <div className="px-5 pt-5 pb-1">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">03 · 生成设置</p>
+              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">04 · 生成设置</p>
             </div>
 
             <div className="p-5 flex flex-col gap-4">
@@ -522,43 +625,15 @@ export default function Home() {
                   </p>
                 </div>
 
-              {/* 生成按钮 */}
-              <button
-                onClick={generateImage}
-                disabled={!canGenerate}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-neutral-800 text-white text-sm font-semibold rounded-xl hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    生成中
-                    {state.resultImages.length > 0 && (
-                      <span className="text-white/70">
-                        （{state.resultImages.length}/{state.imageCount}）
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <i className="ri-sparkling-2-line text-base" />
-                    生成插画
-                    {state.imageCount > 1 && <span className="text-white/70">× {state.imageCount}</span>}
-                  </>
-                )}
-              </button>
-
-              {!hasPrompt && (
-                <p className="text-xs text-center text-neutral-400">请先在上方完成场景描述，生成生图指令</p>
-              )}
             </div>
           </div>
         )}
 
-        {/* ── Card 4：生成结果 ────────────────────────────────────────────── */}
+        {/* ── Card 5：生成结果 ────────────────────────────────────────────── */}
         {(isGenerating || hasResults) && (
           <div ref={resultsRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
             <div className="px-5 pt-5 pb-1 flex items-center justify-between">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">04 · 生成结果</p>
+              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">05 · 生成结果</p>
               {hasResults && !isGenerating && (
                 <div className="flex items-center gap-2">
                   {state.resultImages.length > 1 && (

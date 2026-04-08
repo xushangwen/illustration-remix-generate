@@ -18,6 +18,7 @@ const initialState: AppState = {
   backgroundHints: [],
   refinedPrompt: "",
   refinedPromptZh: "",
+  finalPromptOverride: "",
   aspectRatio: "1:1",
   imageResolution: "2K",
   imageCount: 1,
@@ -62,8 +63,12 @@ function reducer(state: AppState, action: AppAction): AppState {
         ...state,
         refinedPrompt: action.payload.prompt,
         refinedPromptZh: action.payload.promptZh,
+        // 场景描述更新后，清除之前的手动覆盖，重新让用户确认
+        finalPromptOverride: "",
         loadingStage: null,
       };
+    case "SET_FINAL_PROMPT_OVERRIDE":
+      return { ...state, finalPromptOverride: action.payload };
     case "SET_ASPECT_RATIO":
       return { ...state, aspectRatio: action.payload };
     case "SET_IMAGE_RESOLUTION":
@@ -225,6 +230,8 @@ export function useGenerationFlow() {
           backgroundHints: state.backgroundHints,
           referenceImageBase64: state.referenceImageBase64,
           referenceImageMimeType: state.referenceImageMimeType,
+          // 若用户在预览卡片中手动修改了最终指令，优先使用覆盖值
+          finalPromptOverride: state.finalPromptOverride || undefined,
         }),
       });
 
@@ -287,7 +294,14 @@ export function useGenerationFlow() {
     state.backgroundHints,
     state.referenceImageBase64,
     state.referenceImageMimeType,
+    state.finalPromptOverride,
   ]);
+
+  // 用户在最终指令预览卡片中直接修改完整融合 prompt
+  const setFinalPromptOverride = useCallback(
+    (p: string) => dispatch({ type: "SET_FINAL_PROMPT_OVERRIDE", payload: p }),
+    []
+  );
 
   // 用户手动编辑 prompt 时保留原有中文对照（中文不变）
   const setRefinedPrompt = useCallback(
@@ -310,6 +324,7 @@ export function useGenerationFlow() {
     editPrompt,
     generateImage,
     setRefinedPrompt,
+    setFinalPromptOverride,
     setAspectRatio,
     setImageResolution,
     setImageCount,
