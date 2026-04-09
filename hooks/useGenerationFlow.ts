@@ -105,11 +105,17 @@ export function generationFlowReducer(state: AppState, action: AppAction): AppSt
         error: null,
       };
     case "ADD_RESULT_IMAGE":
+      const existingImageIndex = state.resultImages.findIndex((image) => image.index === action.payload.index);
+      const nextImages =
+        existingImageIndex === -1
+          ? [...state.resultImages, action.payload]
+          : state.resultImages.map((image, index) => (index === existingImageIndex ? action.payload : image));
+
       return {
         ...state,
-        resultImages: [...state.resultImages, action.payload],
-        // 每收到一张，pending 减 1
-        pendingCount: Math.max(0, state.pendingCount - 1),
+        resultImages: nextImages.sort((left, right) => left.index - right.index),
+        // 每个 index 只计入一次，避免重复 SSE 导致进度错乱
+        pendingCount: existingImageIndex === -1 ? Math.max(0, state.pendingCount - 1) : state.pendingCount,
       };
     case "ADD_GENERATION_FAILURE":
       return {
@@ -375,15 +381,16 @@ export function useGenerationFlow() {
 
           try {
             const parsed = JSON.parse(dataStr) as {
+              index?: number;
               imageBase64?: string;
               mimeType?: string;
               error?: string;
             };
             if (requestId !== generationRequestIdRef.current) return;
-            if (parsed.imageBase64 && parsed.mimeType) {
+            if (typeof parsed.index === "number" && parsed.imageBase64 && parsed.mimeType) {
               dispatch({
                 type: "ADD_RESULT_IMAGE",
-                payload: { base64: parsed.imageBase64, mimeType: parsed.mimeType },
+                payload: { index: parsed.index, base64: parsed.imageBase64, mimeType: parsed.mimeType },
               });
             } else if (parsed.error) {
               dispatch({ type: "ADD_GENERATION_FAILURE" });

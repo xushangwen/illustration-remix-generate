@@ -1,24 +1,59 @@
 import { getGenAI, VISION_MODEL } from "@/lib/gemini";
 import { buildRefinePromptTemplate } from "@/lib/prompts";
-import { RefinePromptResponse } from "@/lib/types";
-import { safeParseJSON } from "@/lib/image-utils";
+import { MAX_STYLE_KEYWORDS, MAX_USER_DESCRIPTION_LENGTH, normalizeStyleKeywords, parsePromptResponse } from "@/lib/prompt-response";
+
+type RefinePromptRequestBody = {
+  userDescription: string;
+  styleKeywords: string[];
+};
+
+export function validateRefinePromptRequest(body: unknown): { data?: RefinePromptRequestBody; error?: string } {
+  if (!body || typeof body !== "object") {
+    return { error: "请求格式错误" };
+  }
+
+  const payload = body as Record<string, unknown>;
+  const userDescription = typeof payload.userDescription === "string" ? payload.userDescription.trim() : "";
+  const styleKeywords = normalizeStyleKeywords(payload.styleKeywords);
+
+  if (!userDescription) {
+    return { error: "请输入场景描述" };
+  }
+
+  if (userDescription.length > MAX_USER_DESCRIPTION_LENGTH) {
+    return { error: "场景描述过长，请精简后再试" };
+  }
+
+  if (styleKeywords.length === 0) {
+    return { error: "缺少风格关键词，请先完成第一步" };
+  }
+
+  if (styleKeywords.length > MAX_STYLE_KEYWORDS) {
+    return { error: "风格关键词数量过多" };
+  }
+
+  return { data: { userDescription, styleKeywords } };
+}
 
 export async function POST(request: Request) {
+  let rawBody: unknown;
+
   try {
-    const body = await request.json();
-    const { userDescription, styleKeywords } = body as {
-      userDescription: string;
-      styleKeywords: string[];
-    };
+    rawBody = await request.json();
+  } catch {
+    return Response.json({ error: "请求格式错误" }, { status: 400 });
+  }
 
-    if (!userDescription?.trim()) {
-      return Response.json({ error: "请输入场景描述" }, { status: 400 });
-    }
+  const { data, error } = validateRefinePromptRequest(rawBody);
+  if (error) {
+    return Response.json({ error }, { status: 400 });
+  }
+  if (!data) {
+    return Response.json({ error: "请求格式错误" }, { status: 400 });
+  }
 
-    if (!styleKeywords || styleKeywords.length === 0) {
-      return Response.json({ error: "缺少风格关键词，请先完成第一步" }, { status: 400 });
-    }
-
+  try {
+    const { userDescription, styleKeywords } = data;
     const prompt = buildRefinePromptTemplate(userDescription, styleKeywords);
 
     const response = await getGenAI().models.generateContent({
@@ -32,25 +67,7 @@ export async function POST(request: Request) {
       throw new Error("Gemini 未返回有效内容");
     }
 
-    // 解析 JSON，兼容模型偶尔返回 markdown 代码块的情况
-    let refinedPrompt = "";
-    let refinedPromptZh = "";
-
-    try {
-      const parsed = safeParseJSON<{ prompt: string; promptZh: string }>(rawText);
-      refinedPrompt = parsed.prompt?.trim() ?? "";
-      refinedPromptZh = parsed.promptZh?.trim() ?? "";
-    } catch {
-      // 解析失败时退回为纯文本（向后兼容）
-      refinedPrompt = rawText;
-      refinedPromptZh = "";
-    }
-
-    if (!refinedPrompt) {
-      throw new Error("Gemini 未返回有效的 Prompt");
-    }
-
-    return Response.json({ refinedPrompt, refinedPromptZh } satisfies RefinePromptResponse);
+    return Response.json(parsePromptResponse(rawText));
   } catch (error) {
     console.error("[refine-prompt]", error);
     const message = error instanceof Error ? error.message : "Prompt 精化失败，请重试";

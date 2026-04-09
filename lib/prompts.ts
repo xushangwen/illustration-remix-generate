@@ -1,6 +1,20 @@
 // 所有 Gemini Prompt 模板集中管理
 import type { BackgroundMode } from "./types";
 
+const BACKGROUND_TERMS = [
+  "background",
+  "backdrop",
+  "texture",
+  "paper",
+  "wall",
+  "sky",
+  "pattern",
+  "gradient",
+  "grain",
+  "shadow",
+  "surface",
+];
+
 /**
  * Step 1: 插画风格提取
  * 新增 backgroundHints：单独识别背景相关元素，供用户感知并在生成设置中控制
@@ -123,6 +137,35 @@ function buildBackgroundInstruction(
   }
 }
 
+function normalizePromptPhrase(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isBackgroundHint(value: string): boolean {
+  const normalized = normalizePromptPhrase(value);
+  return BACKGROUND_TERMS.some((term) => normalized.includes(term));
+}
+
+function shouldFilterKeyword(keyword: string, backgroundHints: string[]): boolean {
+  const normalizedKeyword = normalizePromptPhrase(keyword);
+  if (!normalizedKeyword) {
+    return false;
+  }
+
+  return backgroundHints.some((hint) => {
+    const normalizedHint = normalizePromptPhrase(hint);
+    return normalizedHint && (
+      normalizedKeyword === normalizedHint ||
+      normalizedKeyword.includes(normalizedHint) ||
+      normalizedHint.includes(normalizedKeyword)
+    );
+  });
+}
+
 /**
  * Step 3: 生图 Prompt —— 垫图模式（参考图 + 文字双重约束）
  * backgroundMode 非 reference 时，主动过滤背景关键词并注入背景覆盖指令
@@ -135,13 +178,17 @@ export function buildFinalImagePromptWithReference(
   backgroundCustomText: string = "",
   backgroundHints: string[] = []
 ): string {
+  const normalizedBackgroundHints = backgroundHints.filter(isBackgroundHint);
+
   // 非"参照原图"模式：从关键词中过滤掉背景相关词，避免背景元素通过关键词通道污染生图
   const filteredKeywords =
     backgroundMode === "reference"
       ? styleKeywords
-      : styleKeywords.filter(
-          (kw) => !backgroundHints.some((hint) => kw.toLowerCase().includes(hint.toLowerCase().split(" ")[0]))
-        );
+      : styleKeywords.filter((keyword) => !shouldFilterKeyword(keyword, normalizedBackgroundHints));
+
+  const keyCharacteristics = filteredKeywords.length > 0
+    ? ` Key characteristics: ${filteredKeywords.join(", ")}.`
+    : "";
 
   const backgroundInstruction = buildBackgroundInstruction(
     backgroundMode,
@@ -156,7 +203,7 @@ Do NOT copy the content or subject matter of the reference image. Do NOT reprodu
 Generate a new illustration in exactly this visual style depicting:
 ${refinedPrompt}
 
-Style notes: ${styleDescription}. Key characteristics: ${filteredKeywords.join(", ")}.${backgroundInstruction}
+Style notes: ${styleDescription}.${keyCharacteristics}${backgroundInstruction}
 
 IMPORTANT: The output image must contain NO text, NO watermarks, NO logos, NO signatures, NO typographic elements of any kind. Pure illustration only.`;
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import imageCompression from "browser-image-compression";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { KeywordBadge } from "@/components/ui/KeywordBadge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { isSupportedImageType, downloadBase64Image, generateFileName, MAX_UPLOAD_BYTES } from "@/lib/image-utils";
@@ -30,11 +31,11 @@ const IMAGE_COUNTS: { value: ImageCount; label: string }[] = [
   { value: 4, label: "× 4" },
 ];
 
-const BACKGROUND_MODES: { value: BackgroundMode; label: string; desc: string; icon: string }[] = [
-  { value: "reference", label: "参照原图", desc: "保留参考图背景风格", icon: "ri-image-line" },
-  { value: "clean",     label: "干净背景", desc: "白色/浅色简洁背景",  icon: "ri-contrast-2-line" },
-  { value: "isolated",  label: "无背景",   desc: "纯主体，适合图标",   icon: "ri-subtract-line" },
-  { value: "custom",    label: "自定义",   desc: "描述你想要的背景",   icon: "ri-edit-line" },
+const BACKGROUND_MODES: { value: BackgroundMode; label: string; desc: string; icon: IconName }[] = [
+  { value: "reference", label: "参照原图", desc: "保留参考图背景风格", icon: "image" },
+  { value: "clean",     label: "干净背景", desc: "白色/浅色简洁背景",  icon: "contrast" },
+  { value: "isolated",  label: "无背景",   desc: "纯主体，适合图标",   icon: "subtract" },
+  { value: "custom",    label: "自定义",   desc: "描述你想要的背景",   icon: "edit" },
 ];
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ export default function Home() {
 
   const [description, setDescription] = useState("");
   const [editRequest, setEditRequest]  = useState("");
-  const [styleCopied, setStyleCopied]  = useState(false);
+  const [styleCopyState, setStyleCopyState] = useState<"idle" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -204,14 +205,19 @@ export default function Home() {
   };
 
   const handleDownloadAll = () => {
-    state.resultImages.forEach((img, i) => handleDownload(img.base64, img.mimeType, i));
+    state.resultImages.forEach((img) => handleDownload(img.base64, img.mimeType, img.index));
   };
 
   const handleCopyStyle = () => {
-    navigator.clipboard.writeText(stylePromptText).then(() => {
-      setStyleCopied(true);
-      setTimeout(() => setStyleCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(stylePromptText)
+      .then(() => {
+        setStyleCopyState("success");
+        setTimeout(() => setStyleCopyState("idle"), 2000);
+      })
+      .catch(() => {
+        setStyleCopyState("error");
+        setTimeout(() => setStyleCopyState("idle"), 2500);
+      });
   };
 
   // ─── JSX ──────────────────────────────────────────────────────────────────────
@@ -221,14 +227,14 @@ export default function Home() {
 
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur-sm">
-        <div className="max-w-[720px] mx-auto px-6 py-3.5 flex items-center justify-between">
+        <div className="mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center">
-              <i className="ri-brush-ai-line text-white text-sm" />
+              <Icon name="brush-ai" className="h-4 w-4 text-white" />
             </div>
             <span className="text-sm font-semibold text-neutral-800">插画风格生成器</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-neutral-400">由 Gemini 驱动</span>
             {(hasStyle || hasResults) && (
               <button
@@ -242,7 +248,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-[720px] w-full mx-auto px-6 py-7 flex flex-col gap-5">
+      <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-5 px-4 py-7 sm:px-6">
 
         {/* ── Card 1：参考风格 ────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
@@ -250,20 +256,25 @@ export default function Home() {
             <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">01 · 参考风格</p>
           </div>
 
-          <div className="p-5 flex gap-5">
+          <div className="flex flex-col gap-5 p-5 sm:flex-row">
             {/* 上传区 */}
             {!state.referenceImagePreview ? (
               <div
-                {...getRootProps()}
-                className={`w-full border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 flex flex-col items-center gap-3 ${
+                {...getRootProps({
+                  role: "button",
+                  tabIndex: 0,
+                  "aria-label": "上传参考插画，可拖拽、点击或粘贴",
+                  "aria-busy": isExtracting,
+                })}
+                className={`flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-all duration-200 sm:p-10 ${
                   isDragActive
                     ? "border-neutral-500 bg-neutral-50"
                     : "border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50"
                 }`}
               >
                 <input {...getInputProps()} />
-                <div className="w-11 h-11 rounded-xl bg-neutral-100 flex items-center justify-center">
-                  <i className="ri-image-add-line text-xl text-neutral-500" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-100">
+                  <Icon name="image-add" className="h-5 w-5 text-neutral-500" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-neutral-700">
@@ -275,8 +286,8 @@ export default function Home() {
             ) : (
               <>
                 {/* 已上传图片缩略图 */}
-                <div className="shrink-0 w-[140px]">
-                  <div className="relative w-[140px] h-[140px] rounded-xl overflow-hidden border border-neutral-200 group">
+                <div className="w-full shrink-0 sm:w-[140px]">
+                  <div className="group relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 sm:h-[140px] sm:w-[140px]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={state.referenceImagePreview}
@@ -284,11 +295,15 @@ export default function Home() {
                       className="w-full h-full object-cover"
                     />
                     <div
-                      {...getRootProps()}
-                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                      {...getRootProps({
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": "重新上传参考插画",
+                      })}
+                      className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/50 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       <input {...getInputProps()} />
-                      <i className="ri-refresh-line text-white text-base" />
+                      <Icon name="refresh" className="h-4 w-4 text-white" />
                       <span className="text-white text-xs">换图</span>
                     </div>
                   </div>
@@ -321,13 +336,19 @@ export default function Home() {
                             onClick={handleCopyStyle}
                             className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
                           >
-                            <i className={styleCopied ? "ri-check-line text-green-500" : "ri-file-copy-line"} />
-                            {styleCopied ? "已复制" : "复制"}
+                            <Icon
+                              name={styleCopyState === "success" ? "check" : "copy"}
+                              className={styleCopyState === "success" ? "h-3.5 w-3.5 text-green-500" : "h-3.5 w-3.5"}
+                            />
+                            {styleCopyState === "success" ? "已复制" : styleCopyState === "error" ? "复制失败" : "复制"}
                           </button>
                         </div>
                         <p className="text-xs text-neutral-500 font-mono bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 leading-relaxed select-all">
                           {stylePromptText}
                         </p>
+                        {styleCopyState === "error" && (
+                          <p className="mt-1.5 text-xs text-red-500">浏览器未允许剪贴板写入，请手动复制。</p>
+                        )}
                         {/* 中文风格摘要 */}
                         {state.styleDescriptionZh && (
                           <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
@@ -340,7 +361,7 @@ export default function Home() {
                       {/* 背景元素预警：检测到背景元素时提示用户 */}
                       {state.backgroundHints.length > 0 && (
                         <div className="flex gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                          <i className="ri-alert-line text-amber-500 text-sm shrink-0 mt-0.5" />
+                          <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                           <div>
                             <p className="text-xs font-medium text-amber-700">检测到背景元素</p>
                             <p className="text-xs text-amber-600 mt-0.5">
@@ -398,7 +419,7 @@ export default function Home() {
                   <button
                     onClick={handleRefine}
                     disabled={isRefining || !description.trim()}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {isRefining && state.loadingStage === "refine" ? (
                       <>
@@ -407,7 +428,7 @@ export default function Home() {
                       </>
                     ) : (
                       <>
-                        <i className="ri-magic-line" />
+                        <Icon name="magic" className="h-4 w-4" />
                         优化措辞
                         <span className="text-xs opacity-40">⌘↵</span>
                       </>
@@ -438,7 +459,7 @@ export default function Home() {
                   </div>
 
                   {/* AI 修改指令输入 */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       type="text"
                       value={editRequest}
@@ -451,12 +472,12 @@ export default function Home() {
                     <button
                       onClick={handleEdit}
                       disabled={isRefining || !editRequest.trim()}
-                      className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-neutral-700 border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {isRefining && state.loadingStage === "edit" ? (
                         <div className="w-3.5 h-3.5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
                       ) : (
-                        <i className="ri-edit-ai-line" />
+                        <Icon name="edit-ai" className="h-4 w-4" />
                       )}
                       AI 修改
                     </button>
@@ -474,14 +495,14 @@ export default function Home() {
         {/* ── Card 3：最终生图指令预览 ───────────────────────────────────── */}
         {hasPrompt && (
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="px-5 pt-5 pb-1 flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-1">
               <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">03 · 最终生图指令</p>
               {isFinalPromptModified && (
                 <button
                   onClick={() => setFinalPromptOverride("")}
                   className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors flex items-center gap-1"
                 >
-                  <i className="ri-refresh-line text-xs" />
+                  <Icon name="refresh" className="h-3.5 w-3.5" />
                   恢复自动
                 </button>
               )}
@@ -524,7 +545,7 @@ export default function Home() {
 
               {isFinalPromptModified && (
                 <p className="text-xs text-amber-600 flex items-center gap-1.5">
-                  <i className="ri-edit-line" />
+                  <Icon name="edit" className="h-4 w-4" />
                   已手动修改，将直接使用此指令生成，不再自动计算
                 </p>
               )}
@@ -547,7 +568,7 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <i className="ri-sparkling-2-line text-base" />
+                    <Icon name="sparkle" className="h-4 w-4" />
                     生成插画
                     {state.imageCount > 1 && <span className="text-white/70">× {state.imageCount}</span>}
                   </>
@@ -649,7 +670,7 @@ export default function Home() {
                             : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
                         } ${m.value === "reference" && state.backgroundHints.length > 0 ? "border-amber-300" : ""}`}
                       >
-                        <i className={m.icon} />
+                        <Icon name={m.icon} className="h-4 w-4" />
                         {m.label}
                       </button>
                     ))}
@@ -677,16 +698,16 @@ export default function Home() {
         {/* ── Card 5：生成结果 ────────────────────────────────────────────── */}
         {(isGenerating || hasResults) && (
           <div ref={resultsRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="px-5 pt-5 pb-1 flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-1">
               <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">05 · 生成结果</p>
               {hasResults && !isGenerating && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {state.resultImages.length > 1 && (
                     <button
                       onClick={handleDownloadAll}
                       className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
                     >
-                      <i className="ri-download-line" />
+                      <Icon name="download" className="h-4 w-4" />
                       全部下载
                     </button>
                   )}
@@ -695,7 +716,7 @@ export default function Home() {
                     disabled={!canGenerate}
                     className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 transition-colors disabled:opacity-40"
                   >
-                    <i className="ri-loop-left-line" />
+                    <Icon name="loop-left" className="h-4 w-4" />
                     重新生成
                   </button>
                 </div>
@@ -706,31 +727,31 @@ export default function Home() {
               {/* 图片 Grid：真实图 + 骨架屏混排 */}
               <div
                 className={`grid gap-3 ${
-                  state.imageCount === 1 ? "grid-cols-1" : "grid-cols-2"
+                  state.imageCount === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"
                 }`}
               >
                 {/* 已生成的真实图片 */}
-                {state.resultImages.map((img, i) => (
+                {state.resultImages.map((img) => (
                   <div
-                    key={i}
+                    key={img.index}
                     className="group relative rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`data:${img.mimeType};base64,${img.base64}`}
-                      alt={`插画 ${i + 1}`}
+                      alt={`插画 ${img.index + 1}`}
                       className="w-full h-auto block"
                     />
                     <button
-                      onClick={() => handleDownload(img.base64, img.mimeType, i)}
-                      className="absolute bottom-2 right-2 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/60 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/80"
+                      onClick={() => handleDownload(img.base64, img.mimeType, img.index)}
+                      className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white opacity-100 backdrop-blur-sm transition-opacity hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100"
                     >
-                      <i className="ri-download-line" />
+                      <Icon name="download" className="h-4 w-4" />
                       下载
                     </button>
                     {state.imageCount > 1 && (
                       <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white text-xs rounded backdrop-blur-sm">
-                        {i + 1}
+                        {img.index + 1}
                       </span>
                     )}
                   </div>
@@ -759,7 +780,7 @@ export default function Home() {
 
               {state.generationFailures > 0 && hasResults && !isGenerating && (
                 <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <i className="ri-alert-line text-sm text-amber-600 shrink-0 mt-0.5" />
+                  <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                   <p className="text-xs leading-relaxed text-amber-700">
                     已成功生成 {state.resultImages.length} 张，另有 {state.generationFailures} 张失败。可点击「重新生成」重试。
                   </p>

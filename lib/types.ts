@@ -11,6 +11,7 @@ export type LoadingStage = "extract" | "refine" | "edit" | "generate" | null;
 export type BackgroundMode = "reference" | "clean" | "isolated" | "custom";
 
 export interface ResultImage {
+  index: number;
   base64: string;
   mimeType: string;
 }

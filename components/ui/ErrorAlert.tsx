@@ -1,5 +1,7 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
+
 interface ErrorAlertProps {
   message: string;
   onDismiss?: () => void;
@@ -7,12 +9,20 @@ interface ErrorAlertProps {
 
 export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
   return (
-    <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-      <i className="ri-error-warning-line text-base mt-0.5 shrink-0" />
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+    >
+      <Icon name="error" className="mt-0.5 h-4 w-4 shrink-0" />
       <span className="flex-1">{message}</span>
       {onDismiss && (
-        <button onClick={onDismiss} className="shrink-0 hover:text-red-900 transition-colors">
-          <i className="ri-close-line" />
+        <button
+          onClick={onDismiss}
+          aria-label="关闭错误提示"
+          className="shrink-0 transition-colors hover:text-red-900"
+        >
+          <Icon name="close" className="h-4 w-4" />
         </button>
       )}
     </div>

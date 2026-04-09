@@ -2,6 +2,7 @@ import { getGenAI, IMAGE_GEN_MODEL } from "@/lib/gemini";
 import { buildFinalImagePromptWithReference } from "@/lib/prompts";
 import { AspectRatio, ImageResolution, ImageCount, BackgroundMode } from "@/lib/types";
 import { isSupportedImageType } from "@/lib/image-utils";
+import { MAX_STYLE_KEYWORDS, normalizeStyleKeywords } from "@/lib/prompt-response";
 import type { GoogleGenAI } from "@google/genai";
 
 export const maxDuration = 180;
@@ -29,7 +30,7 @@ const ALLOWED_BACKGROUND_MODES = new Set<BackgroundMode>(["reference", "clean", 
 const MAX_REFINED_PROMPT_LENGTH = 2000;
 const MAX_FINAL_PROMPT_LENGTH = 8000;
 const MAX_BACKGROUND_TEXT_LENGTH = 300;
-const MAX_STYLE_KEYWORDS = 20;
+const MAX_REFERENCE_IMAGE_BYTES = 2 * 1024 * 1024;
 export const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 export const RATE_LIMIT_MAX_REQUESTS = 6;
 const generateRequestLog = new Map<string, number[]>();
@@ -70,12 +71,34 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "图片生成失败";
 }
 
-function getClientId(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+export function estimateBase64Bytes(base64: string): number {
+  const normalized = base64.replace(/\s+/g, "");
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.floor((normalized.length * 3) / 4) - padding;
+}
+
+function isValidBase64(base64: string): boolean {
+  return /^[A-Za-z0-9+/]+={0,2}$/.test(base64);
+}
+
+export function getClientId(request: Request): string | null {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwardedFor) {
+    return `ip:${forwardedFor}`;
+  }
+
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) {
+    return `ip:${realIp}`;
+  }
+
+  const userAgent = request.headers.get("user-agent")?.trim();
+  const acceptLanguage = request.headers.get("accept-language")?.split(",")[0]?.trim();
+  if (userAgent || acceptLanguage) {
+    return `fingerprint:${userAgent ?? "unknown"}:${acceptLanguage ?? "unknown"}`;
+  }
+
+  return null;
 }
 
 export function isRateLimited(clientId: string): boolean {
@@ -95,9 +118,7 @@ export function validateGenerateImageRequest(body: unknown): { data?: GenerateRe
 
   const payload = body as Record<string, unknown>;
   const refinedPrompt = typeof payload.refinedPrompt === "string" ? payload.refinedPrompt.trim() : "";
-  const styleKeywords = isStringArray(payload.styleKeywords)
-    ? payload.styleKeywords.map((keyword) => keyword.trim()).filter(Boolean)
-    : [];
+  const styleKeywords = normalizeStyleKeywords(payload.styleKeywords);
   const styleDescription = typeof payload.styleDescription === "string" ? payload.styleDescription.trim() : "";
   const backgroundCustomText =
     typeof payload.backgroundCustomText === "string" ? payload.backgroundCustomText.trim() : "";
@@ -129,6 +150,14 @@ export function validateGenerateImageRequest(body: unknown): { data?: GenerateRe
 
   if (!referenceImageBase64 || !referenceImageMimeType) {
     return { error: "缺少参考图数据，请重新上传参考图" };
+  }
+
+  if (!isValidBase64(referenceImageBase64)) {
+    return { error: "参考图数据损坏，请重新上传参考图" };
+  }
+
+  if (estimateBase64Bytes(referenceImageBase64) > MAX_REFERENCE_IMAGE_BYTES) {
+    return { error: "参考图数据过大，请重新上传更小的图片" };
   }
 
   if (!isSupportedImageType(referenceImageMimeType)) {
@@ -195,7 +224,7 @@ export async function POST(request: Request) {
   }
 
   const clientId = getClientId(request);
-  if (isRateLimited(clientId)) {
+  if (clientId && isRateLimited(clientId)) {
     return Response.json({ error: "请求过于频繁，请稍后再试" }, { status: 429 });
   }
 

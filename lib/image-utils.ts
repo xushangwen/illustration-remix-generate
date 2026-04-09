@@ -21,12 +21,32 @@ export function isSupportedImageType(mimeType: string): mimeType is SupportedMim
  * 处理 LLM 偶尔在 JSON 前后附加 markdown 代码块的情况
  */
 export function safeParseJSON<T>(text: string): T {
-  const cleaned = text
-    .replace(/^```(?:json)?\n?/m, "")
-    .replace(/\n?```$/m, "")
-    .trim();
+  const cleaned = extractJsonCandidate(text);
 
   return JSON.parse(cleaned) as T;
+}
+
+function extractJsonCandidate(text: string): string {
+  const trimmed = text.trim();
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const objectStart = trimmed.indexOf("{");
+  const objectEnd = trimmed.lastIndexOf("}");
+  if (objectStart !== -1 && objectEnd > objectStart) {
+    return trimmed.slice(objectStart, objectEnd + 1).trim();
+  }
+
+  const arrayStart = trimmed.indexOf("[");
+  const arrayEnd = trimmed.lastIndexOf("]");
+  if (arrayStart !== -1 && arrayEnd > arrayStart) {
+    return trimmed.slice(arrayStart, arrayEnd + 1).trim();
+  }
+
+  return trimmed;
 }
 
 const MIME_TO_EXT: Record<string, string> = {

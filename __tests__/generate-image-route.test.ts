@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   POST,
   RATE_LIMIT_MAX_REQUESTS,
+  estimateBase64Bytes,
+  getClientId,
   isRateLimited,
   resetGenerateImageRateLimitForTests,
   validateGenerateImageRequest,
@@ -62,6 +64,15 @@ describe("generate-image route validation", () => {
     expect(result.error).toBe("参考图格式不受支持，请重新上传参考图");
   });
 
+  it("rejects oversized base64 reference payloads", () => {
+    const oversizedBase64 = "A".repeat(Math.ceil((2 * 1024 * 1024 * 4) / 3) + 4);
+    const result = validateGenerateImageRequest(
+      buildValidRequestBody({ referenceImageBase64: oversizedBase64 })
+    );
+
+    expect(result.error).toBe("参考图数据过大，请重新上传更小的图片");
+  });
+
   it("enforces the in-memory rate limit window", () => {
     for (let index = 0; index < RATE_LIMIT_MAX_REQUESTS; index += 1) {
       expect(isRateLimited("127.0.0.1")).toBe(false);
@@ -69,5 +80,26 @@ describe("generate-image route validation", () => {
 
     expect(isRateLimited("127.0.0.1")).toBe(true);
     expect(isRateLimited("127.0.0.2")).toBe(false);
+  });
+
+  it("derives a client id from proxy headers or request fingerprint", () => {
+    const proxiedRequest = new Request("http://localhost/api/generate-image", {
+      headers: { "x-forwarded-for": "203.0.113.10, 10.0.0.1" },
+    });
+    const fingerprintedRequest = new Request("http://localhost/api/generate-image", {
+      headers: {
+        "user-agent": "Vitest",
+        "accept-language": "zh-CN,zh;q=0.9",
+      },
+    });
+    const anonymousRequest = new Request("http://localhost/api/generate-image");
+
+    expect(getClientId(proxiedRequest)).toBe("ip:203.0.113.10");
+    expect(getClientId(fingerprintedRequest)).toBe("fingerprint:Vitest:zh-CN");
+    expect(getClientId(anonymousRequest)).toBeNull();
+  });
+
+  it("estimates decoded base64 bytes accurately", () => {
+    expect(estimateBase64Bytes("ZmFrZQ==")).toBe(4);
   });
 });

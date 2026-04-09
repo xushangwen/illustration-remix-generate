@@ -31,7 +31,7 @@ describe("generationFlowReducer", () => {
       imageCount: 4,
       backgroundMode: "custom",
       backgroundCustomText: "forest background",
-      resultImages: [{ base64: "img", mimeType: "image/png" }],
+      resultImages: [{ index: 0, base64: "img", mimeType: "image/png" }],
       pendingCount: 2,
       generationFailures: 1,
       error: "old error",
@@ -80,11 +80,32 @@ describe("generationFlowReducer", () => {
       loadingStage: "generate",
       generationFailures: 1,
       pendingCount: 1,
-      resultImages: [{ base64: "img", mimeType: "image/png" }],
+      resultImages: [{ index: 0, base64: "img", mimeType: "image/png" }],
     });
 
     const finalPartialSuccessState = generationFlowReducer(partialSuccessState, { type: "FINISH_GENERATE" });
 
     expect(finalPartialSuccessState.error).toBeNull();
+  });
+
+  it("sorts generated images by server index and ignores duplicate slots", () => {
+    const withSecondImage = generationFlowReducer(
+      buildState({ pendingCount: 2, loadingStage: "generate" }),
+      { type: "ADD_RESULT_IMAGE", payload: { index: 1, base64: "img-2", mimeType: "image/png" } }
+    );
+
+    const withBothImages = generationFlowReducer(withSecondImage, {
+      type: "ADD_RESULT_IMAGE",
+      payload: { index: 0, base64: "img-1", mimeType: "image/png" },
+    });
+
+    const withDuplicateIndex = generationFlowReducer(withBothImages, {
+      type: "ADD_RESULT_IMAGE",
+      payload: { index: 1, base64: "img-2-duplicate", mimeType: "image/png" },
+    });
+
+    expect(withBothImages.resultImages.map((image) => image.index)).toEqual([0, 1]);
+    expect(withDuplicateIndex.resultImages).toHaveLength(2);
+    expect(withDuplicateIndex.pendingCount).toBe(0);
   });
 });
