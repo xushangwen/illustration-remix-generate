@@ -295,7 +295,7 @@ export default function Home() {
                   <Icon name="image-add" className="h-5 w-5 text-neutral-500" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">
+                  <p className="text-[13px] font-medium text-neutral-700">
                     {isDragActive ? "松开上传" : "拖拽 / 点击 / ⌘V 粘贴参考插画"}
                   </p>
                   <p className="text-xs text-neutral-400 mt-1">JPG · PNG · WebP，最大 10MB</p>
@@ -332,7 +332,7 @@ export default function Home() {
                   {isExtracting ? (
                     <div className="flex items-center gap-2.5 py-4">
                       <div className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin shrink-0" />
-                      <span className="text-sm text-neutral-500">正在分析风格特征...</span>
+                      <span className="text-[13px] text-neutral-500">正在分析风格特征...</span>
                     </div>
                   ) : hasStyle ? (
                     <div className="flex flex-col gap-3">
@@ -431,13 +431,13 @@ export default function Home() {
                   placeholder="保持上面的风格，画一个啤酒杯…&#10;或：一只猫坐在城市屋顶上，俯瞰夜景…"
                   rows={3}
                   disabled={isRefining}
-                  className="w-full px-4 py-3 text-sm text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:opacity-60 leading-relaxed"
+                  className="w-full px-4 py-3 text-[13px] text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:opacity-60 leading-relaxed"
                 />
                 <div className="flex justify-end">
                   <button
                     onClick={handleRefine}
                     disabled={isRefining || !description.trim()}
-                    className="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-2 text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {isRefining && state.loadingStage === "refine" ? (
                       <>
@@ -465,7 +465,7 @@ export default function Home() {
                       onChange={(e) => setRefinedPrompt(e.target.value)}
                       rows={4}
                       disabled={isRefining}
-                      className="w-full px-4 py-3 text-sm text-neutral-700 tracking-[0.01em] bg-white border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all leading-relaxed disabled:opacity-60"
+                      className="w-full px-4 py-3 text-[13px] text-neutral-700 tracking-[0.01em] bg-white border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all leading-relaxed disabled:opacity-60"
                     />
                     {/* 中文对照 */}
                     {state.refinedPromptZh && (
@@ -485,12 +485,12 @@ export default function Home() {
                       onKeyDown={(e) => e.key === "Enter" && !isRefining && handleEdit()}
                       placeholder="修改描述：把主角换成机器人、去掉背景里的树..."
                       disabled={isRefining}
-                      className="flex-1 px-4 py-2.5 text-sm text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:opacity-60"
+                      className="flex-1 px-4 py-2.5 text-[13px] text-neutral-800 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:opacity-60"
                     />
                     <button
                       onClick={handleEdit}
                       disabled={isRefining || !editRequest.trim()}
-                      className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2.5 text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {isRefining && state.loadingStage === "edit" ? (
                         <div className="w-3.5 h-3.5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
@@ -572,7 +572,7 @@ export default function Home() {
               <button
                 onClick={generateImage}
                 disabled={!canGenerate}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-neutral-800 text-white text-sm font-semibold rounded-xl hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-neutral-800 text-white text-[13px] font-semibold rounded-xl hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isGenerating ? (
                   <>
