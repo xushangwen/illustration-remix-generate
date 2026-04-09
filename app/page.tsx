@@ -230,7 +230,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center">
-              <Icon name="brush-ai" className="h-4 w-4 text-white" />
+              <Icon name="brush-ai" className="h-4 w-4 text-base text-white" />
             </div>
             <span className="text-sm font-semibold text-neutral-800">插画风格生成器</span>
           </div>
