@@ -10,7 +10,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource-variable/space-grotesk": "^5.2.10",
     "@google/genai": "^1.48.0",
+    "@ibm/plex-sans-sc": "^1.1.0",
     "browser-image-compression": "^2.0.2",
     "next": "16.2.2",
     "react": "19.2.4",

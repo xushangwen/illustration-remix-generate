@@ -38,6 +38,12 @@ const BACKGROUND_MODES: { value: BackgroundMode; label: string; desc: string; ic
   { value: "custom",    label: "自定义",   desc: "描述你想要的背景",   icon: "edit" },
 ];
 
+const CARD_SHELL =
+  "relative rounded-[20px] border border-white/70 bg-white/88 shadow-[0_1px_0_rgba(255,255,255,0.95)_inset,0_0_0_1px_rgba(255,255,255,0.28)_inset,0_18px_40px_-30px_rgba(93,72,35,0.22),0_10px_18px_-16px_rgba(23,23,23,0.12)] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent";
+
+const CARD_HEADING =
+  "text-[13px] font-semibold uppercase tracking-[0.18em] text-neutral-600";
+
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -223,16 +229,28 @@ export default function Home() {
   // ─── JSX ──────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col">
+    <div className="relative min-h-screen overflow-x-clip bg-[#f6f2e9] text-neutral-900 flex flex-col">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_top,_rgba(244,221,170,0.32),_transparent_58%),linear-gradient(180deg,_rgba(255,255,255,0.58),_rgba(255,255,255,0))]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-24 top-36 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.44)] blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute right-[-88px] top-24 h-64 w-64 rounded-full bg-[rgba(233,212,172,0.26)] blur-3xl"
+      />
 
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-10 border-b border-white/60 bg-white/72 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-900/10 bg-neutral-900 shadow-[0_8px_18px_-12px_rgba(23,23,23,0.65)]">
               <Icon name="brush-ai" className="h-4 w-4 text-base text-white" />
             </div>
-            <span className="text-sm font-semibold text-neutral-800">插画风格生成器</span>
+            <span className="text-sm font-semibold tracking-[0.01em] text-neutral-800">插画风格生成器</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-neutral-400">由 Gemini 驱动</span>
@@ -248,12 +266,12 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-5 px-4 py-7 sm:px-6">
+      <main className="relative mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-5 px-4 py-7 sm:px-6">
 
         {/* ── Card 1：参考风格 ────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="px-5 pt-5 pb-1">
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">01 · 参考风格</p>
+        <div className={`${CARD_SHELL} overflow-hidden`}>
+          <div className="px-5 pt-5 pb-2">
+            <p className={CARD_HEADING}>01 · 参考风格</p>
           </div>
 
           <div className="flex flex-col gap-5 p-5 sm:flex-row">
@@ -343,7 +361,7 @@ export default function Home() {
                             {styleCopyState === "success" ? "已复制" : styleCopyState === "error" ? "复制失败" : "复制"}
                           </button>
                         </div>
-                        <p className="text-xs text-neutral-500 font-mono bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 leading-relaxed select-all">
+                        <p className="text-xs text-neutral-500 tracking-[0.01em] bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 leading-relaxed select-all">
                           {stylePromptText}
                         </p>
                         {styleCopyState === "error" && (
@@ -395,9 +413,9 @@ export default function Home() {
 
         {/* ── Card 2：描述 + Prompt ───────────────────────────────────────── */}
         {hasStyle && (
-          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="px-5 pt-5 pb-1">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">02 · 描述新主题</p>
+          <div className={CARD_SHELL}>
+            <div className="px-5 pt-5 pb-2">
+              <p className={CARD_HEADING}>02 · 描述新主题</p>
             </div>
 
             <div className="p-5 flex flex-col gap-4">
@@ -447,7 +465,7 @@ export default function Home() {
                       onChange={(e) => setRefinedPrompt(e.target.value)}
                       rows={4}
                       disabled={isRefining}
-                      className="w-full px-4 py-3 text-sm text-neutral-700 bg-white border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all font-mono leading-relaxed disabled:opacity-60"
+                      className="w-full px-4 py-3 text-sm text-neutral-700 tracking-[0.01em] bg-white border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all leading-relaxed disabled:opacity-60"
                     />
                     {/* 中文对照 */}
                     {state.refinedPromptZh && (
@@ -494,9 +512,9 @@ export default function Home() {
 
         {/* ── Card 3：最终生图指令预览 ───────────────────────────────────── */}
         {hasPrompt && (
-          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-1">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">03 · 最终生图指令</p>
+          <div className={CARD_SHELL}>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-2">
+              <p className={CARD_HEADING}>03 · 最终生图指令</p>
               {isFinalPromptModified && (
                 <button
                   onClick={() => setFinalPromptOverride("")}
@@ -519,7 +537,7 @@ export default function Home() {
                 onChange={(e) => setFinalPromptOverride(e.target.value)}
                 rows={8}
                 disabled={isGenerating}
-                className={`w-full px-4 py-3 text-xs text-neutral-700 bg-neutral-50 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all font-mono leading-relaxed disabled:opacity-60 ${
+                className={`w-full px-4 py-3 text-xs text-neutral-700 tracking-[0.01em] bg-neutral-50 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:border-transparent transition-all leading-relaxed disabled:opacity-60 ${
                   isFinalPromptModified ? "border-amber-300 bg-amber-50/30" : "border-neutral-200"
                 }`}
               />
@@ -580,9 +598,9 @@ export default function Home() {
 
         {/* ── Card 4：生成设置 ────────────────────────────────────────────── */}
         {hasStyle && (
-          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="px-5 pt-5 pb-1">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">04 · 生成设置</p>
+          <div className={CARD_SHELL}>
+            <div className="px-5 pt-5 pb-2">
+              <p className={CARD_HEADING}>04 · 生成设置</p>
             </div>
 
             <div className="p-5 flex flex-col gap-4">
@@ -697,9 +715,9 @@ export default function Home() {
 
         {/* ── Card 5：生成结果 ────────────────────────────────────────────── */}
         {(isGenerating || hasResults) && (
-          <div ref={resultsRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-1">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">05 · 生成结果</p>
+          <div ref={resultsRef} className={CARD_SHELL}>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-2">
+              <p className={CARD_HEADING}>05 · 生成结果</p>
               {hasResults && !isGenerating && (
                 <div className="flex flex-wrap items-center gap-2">
                   {state.resultImages.length > 1 && (
@@ -791,6 +809,17 @@ export default function Home() {
         )}
 
       </main>
+
+      <footer className="relative border-t border-white/45 bg-white/30">
+        <div className="mx-auto flex w-full max-w-[720px] flex-col gap-2 px-4 py-6 text-center sm:px-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500/90">
+            Design by QiaoYa
+          </p>
+          <p className="text-xs leading-relaxed text-neutral-500/80">
+            Copyright © 2026 QiaoYa. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

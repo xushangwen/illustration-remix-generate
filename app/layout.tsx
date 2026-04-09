@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import "@fontsource-variable/space-grotesk/wght.css";
+import "@ibm/plex-sans-sc/css/ibm-plex-sans-sc-all.css";
 import "remixicon/fonts/remixicon.css";
 import "./globals.css";
 
