@@ -23,7 +23,7 @@ type GenerateRequestBody = {
   finalPromptOverride?: string;
 };
 
-const ALLOWED_ASPECT_RATIOS = new Set<AspectRatio>(["16:9", "1:1", "9:16"]);
+const ALLOWED_ASPECT_RATIOS = new Set<AspectRatio>(["16:9", "4:3", "1:1", "3:4", "9:16"]);
 const ALLOWED_IMAGE_RESOLUTIONS = new Set<ImageResolution>(["1K", "2K", "4K"]);
 const ALLOWED_IMAGE_COUNTS = new Set<ImageCount>([1, 2, 4]);
 const ALLOWED_BACKGROUND_MODES = new Set<BackgroundMode>(["reference", "clean", "isolated", "custom"]);

@@ -1,4 +1,4 @@
-export type AspectRatio = "16:9" | "1:1" | "9:16";
+export type AspectRatio = "16:9" | "4:3" | "1:1" | "3:4" | "9:16";
 export type ImageResolution = "1K" | "2K" | "4K";
 export type ImageCount = 1 | 2 | 4;
 export type LoadingStage = "extract" | "refine" | "edit" | "generate" | null;

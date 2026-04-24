@@ -22,8 +22,10 @@ import type {
 } from "@/lib/types";
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
-  { value: "1:1", label: "1:1", desc: "方形" },
   { value: "16:9", label: "16:9", desc: "横版" },
+  { value: "4:3", label: "4:3", desc: "横版" },
+  { value: "1:1", label: "1:1", desc: "方形" },
+  { value: "3:4", label: "3:4", desc: "竖版" },
   { value: "9:16", label: "9:16", desc: "竖版" },
 ];
 
